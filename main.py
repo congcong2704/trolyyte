@@ -36,7 +36,7 @@ async def message(req: Request):
         response = client.chat.completions.create(
             model="openai/gpt-oss-120b",
             messages=conversations[user],
-            max_completion_tokens=512
+            max_completion_tokens=2048
         )
         reply = response.choices[0].message.content
         conversations[user].append({"role": "assistant", "content": reply})
