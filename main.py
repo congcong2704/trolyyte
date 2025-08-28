@@ -2,6 +2,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from groq import Groq
 import json
+import datetime
+import re
+from fastapi import HTTPException
 
 app = FastAPI()
 
@@ -55,11 +58,26 @@ async def get_appts(user: str):
 @app.post("/api/book")
 async def book(req: Request):
     data = await req.json()
+    user = data.get("user")
+    clinic = data.get("clinic")
+    date_str = data.get("date")
+    time_str = data.get("time")
+
+    # validate date
+    try:
+        datetime.datetime.strptime(date_str, "%Y-%m-%d")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ngày không hợp lệ. Dùng định dạng YYYY-MM-DD và ngày thực tế.")
+
+    # validate time HH:MM
+    if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", time_str or ""):
+        raise HTTPException(status_code=400, detail="Giờ không hợp lệ. Dùng định dạng HH:MM (00:00-23:59).")
+
     appt = {
-        "user": data["user"],
-        "clinic": data["clinic"],
-        "date": data["date"],
-        "time": data["time"],
+        "user": user,
+        "clinic": clinic,
+        "date": date_str,
+        "time": time_str,
     }
     appointments.append(appt)
     return {"message": "Đặt lịch thành công", "appointment": appt}
