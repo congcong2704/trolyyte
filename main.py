@@ -28,12 +28,18 @@ async def message(req: Request):
     user = data.get("username")
     msg = data.get("message")
 
+    # Chuẩn hoá: bỏ dấu nhưng vẫn giữ bản gốc
+    msg_no_diacritics = remove_diacritics(msg)
+
     if user not in conversations:
         conversations[user] = [
-            {"role": "system", "content": "Bạn là một trợ lí y tế hữu ích."}
+            {"role": "system", "content": "Bạn là một trợ lí y tế hữu ích. Bạn có thể hiểu cả tiếng Việt có dấu và không dấu."}
         ]
 
-    conversations[user].append({"role": "user", "content": msg})
+    # Thêm cả bản gốc và bản không dấu để model dễ hiểu
+    conversations[user].append(
+        {"role": "user", "content": f"{msg} (không dấu: {msg_no_diacritics})"}
+    )
 
     try:
         response = client.chat.completions.create(
@@ -47,6 +53,7 @@ async def message(req: Request):
         reply = f"Lỗi gọi Groq API: {e}"
 
     return {"reply": reply}
+
 
 
 @app.get("/api/appointments")
