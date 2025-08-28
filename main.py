@@ -6,11 +6,6 @@ import datetime
 import re
 import unicodedata
 
-def remove_accents(text: str) -> str:
-    # Chuẩn hóa chuỗi Unicode và loại bỏ dấu
-    nfkd_form = unicodedata.normalize('NFD', text)
-    return ''.join([c for c in nfkd_form if not unicodedata.combining(c)])
-
 app = FastAPI()
 
 # Cho phép frontend (index.html) gọi API
@@ -27,6 +22,12 @@ client = Groq(api_key="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"
 appointments = []
 conversations = {}
 
+# Hàm bỏ dấu tiếng Việt
+def remove_accents(text: str) -> str:
+    nfkd_form = unicodedata.normalize('NFD', text)
+    return ''.join([c for c in nfkd_form if not unicodedata.combining(c)])
+
+
 @app.post("/api/message")
 async def message(req: Request):
     data = await req.json()
@@ -41,7 +42,7 @@ async def message(req: Request):
             {"role": "system", "content": "Bạn là một trợ lí y tế hữu ích."}
         ]
 
-    # Thêm cả bản gốc và bản không dấu vào hội thoại
+    # Lưu cả bản gốc và bản không dấu để bot hiểu
     conversations[user].append({"role": "user", "content": msg})
     conversations[user].append({"role": "user", "content": msg_no_diacritics})
 
@@ -57,7 +58,6 @@ async def message(req: Request):
         reply = f"Lỗi gọi Groq API: {e}"
 
     return {"reply": reply}
-
 
 
 @app.get("/api/appointments")
