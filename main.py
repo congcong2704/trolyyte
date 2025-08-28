@@ -4,7 +4,6 @@ from groq import Groq
 import json
 import datetime
 import re
-import unicodedata
 
 app = FastAPI()
 
@@ -22,31 +21,18 @@ client = Groq(api_key="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"
 appointments = []
 conversations = {}
 
-def remove_diacritics(text: str) -> str:
-    """Loại bỏ dấu tiếng Việt"""
-    return ''.join(
-        c for c in unicodedata.normalize('NFD', text)
-        if unicodedata.category(c) != 'Mn'
-    )
-
 @app.post("/api/message")
 async def message(req: Request):
     data = await req.json()
     user = data.get("username")
     msg = data.get("message")
 
-    # Chuẩn hoá không dấu
-    msg_no_diacritics = remove_diacritics(msg)
-
     if user not in conversations:
         conversations[user] = [
-            {"role": "system", "content": "Bạn là một trợ lí y tế hữu ích. Bạn có thể hiểu cả tiếng Việt có dấu và không dấu."}
+            {"role": "system", "content": "Bạn là một trợ lí y tế hữu ích."}
         ]
 
-    # Thêm cả bản gốc và bản không dấu
-    conversations[user].append(
-        {"role": "user", "content": f"{msg} (khong dau: {msg_no_diacritics})"}
-    )
+    conversations[user].append({"role": "user", "content": msg})
 
     try:
         response = client.chat.completions.create(
@@ -99,4 +85,5 @@ async def book(req: Request):
         "time": time_str,
     }
     appointments.append(appt)
+
     return {"message": "Đặt lịch thành công", "appointment": appt}
