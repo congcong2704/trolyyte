@@ -63,20 +63,26 @@ async def book(req: Request):
     date_str = data.get("date")
     time_str = data.get("time")
 
-    # validate date
+    # validate date (YYYY-MM-DD và phải là ngày hợp lệ)
     try:
-        datetime.datetime.strptime(date_str, "%Y-%m-%d")
-    except Exception:
-        raise HTTPException(status_code=400, detail="Ngày không hợp lệ. Dùng định dạng YYYY-MM-DD và ngày thực tế.")
+        date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Ngày không hợp lệ. Dùng định dạng YYYY-MM-DD và ngày thực tế."
+        )
 
-    # validate time HH:MM
+    # validate time HH:MM (00:00 - 23:59)
     if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", time_str or ""):
-        raise HTTPException(status_code=400, detail="Giờ không hợp lệ. Dùng định dạng HH:MM (00:00-23:59).")
+        raise HTTPException(
+            status_code=400,
+            detail="Giờ không hợp lệ. Dùng định dạng HH:MM (00:00-23:59)."
+        )
 
     appt = {
         "user": user,
         "clinic": clinic,
-        "date": date_str,
+        "date": str(date_obj),  # lưu lại theo chuẩn YYYY-MM-DD
         "time": time_str,
     }
     appointments.append(appt)
