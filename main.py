@@ -1,10 +1,10 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from groq import Groq
 import json
 import datetime
 import re
-from fastapi import HTTPException
+import unicodedata   # << thêm thư viện này
 
 app = FastAPI()
 
@@ -22,18 +22,31 @@ client = Groq(api_key="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"
 appointments = []
 conversations = {}
 
+# -----------------------------
+# Hàm bỏ dấu tiếng Việt
+# -----------------------------
+def remove_accents(text: str) -> str:
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', text)
+        if unicodedata.category(c) != 'Mn'
+    )
+
 @app.post("/api/message")
 async def message(req: Request):
     data = await req.json()
     user = data.get("username")
     msg = data.get("message")
 
+    # Chuẩn hóa input (bỏ dấu + lowercase)
+    normalized_msg = remove_accents(msg).lower()
+
     if user not in conversations:
         conversations[user] = [
             {"role": "system", "content": "Bạn là một trợ lí y tế hữu ích."}
         ]
 
-    conversations[user].append({"role": "user", "content": msg})
+    # Lưu cả bản gốc và bản không dấu để tiện xử lý
+    conversations[user].append({"role": "user", "content": normalized_msg})
 
     try:
         response = client.chat.completions.create(
@@ -47,43 +60,3 @@ async def message(req: Request):
         reply = f"Lỗi gọi Groq API: {e}"
 
     return {"reply": reply}
-
-
-@app.get("/api/appointments")
-async def get_appts(user: str):
-    user_appts = [a for a in appointments if a["user"] == user]
-    return {"appointments": user_appts}
-
-
-@app.post("/api/book")
-async def book(req: Request):
-    data = await req.json()
-    user = data.get("user")
-    clinic = data.get("clinic")
-    date_str = data.get("date")
-    time_str = data.get("time")
-
-    # validate date
-    try:
-        datetime.datetime.strptime(date_str, "%Y-%m-%d")
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Ngày không hợp lệ: {str(e)}. Dùng định dạng YYYY-MM-DD (ví dụ: 2024-08-28)."
-        )
-
-    # validate time HH:MM
-    if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", time_str or ""):
-        raise HTTPException(
-            status_code=400,
-            detail="Giờ không hợp lệ. Dùng định dạng HH:MM (00:00-23:59)."
-        )
-
-    appt = {
-        "user": user,
-        "clinic": clinic,
-        "date": date_str,
-        "time": time_str,
-    }
-    appointments.append(appt)
-    return {"message": "Đặt lịch thành công", "appointment": appt}
