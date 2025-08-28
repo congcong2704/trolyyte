@@ -1,10 +1,10 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from groq import Groq
 import json
 import datetime
 import re
-from fastapi import HTTPException
+import unicodedata
 
 app = FastAPI()
 
@@ -22,13 +22,20 @@ client = Groq(api_key="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"
 appointments = []
 conversations = {}
 
+def remove_diacritics(text: str) -> str:
+    """Loại bỏ dấu tiếng Việt"""
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', text)
+        if unicodedata.category(c) != 'Mn'
+    )
+
 @app.post("/api/message")
 async def message(req: Request):
     data = await req.json()
     user = data.get("username")
     msg = data.get("message")
 
-    # Chuẩn hoá: bỏ dấu nhưng vẫn giữ bản gốc
+    # Chuẩn hoá không dấu
     msg_no_diacritics = remove_diacritics(msg)
 
     if user not in conversations:
@@ -36,9 +43,9 @@ async def message(req: Request):
             {"role": "system", "content": "Bạn là một trợ lí y tế hữu ích. Bạn có thể hiểu cả tiếng Việt có dấu và không dấu."}
         ]
 
-    # Thêm cả bản gốc và bản không dấu để model dễ hiểu
+    # Thêm cả bản gốc và bản không dấu
     conversations[user].append(
-        {"role": "user", "content": f"{msg} (không dấu: {msg_no_diacritics})"}
+        {"role": "user", "content": f"{msg} (khong dau: {msg_no_diacritics})"}
     )
 
     try:
@@ -53,7 +60,6 @@ async def message(req: Request):
         reply = f"Lỗi gọi Groq API: {e}"
 
     return {"reply": reply}
-
 
 
 @app.get("/api/appointments")
@@ -81,7 +87,7 @@ async def book(req: Request):
 
     # validate time HH:MM (00:00 - 23:59)
     if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", time_str or ""):
-        raise HTTPException(    
+        raise HTTPException(
             status_code=400,
             detail="Giờ không hợp lệ. Dùng định dạng HH:MM (00:00-23:59)."
         )
