@@ -45,8 +45,11 @@ async def message(req: Request):
             {"role": "system", "content": "Bạn là một trợ lí y tế hữu ích."}
         ]
 
-    # Lưu cả bản gốc và bản không dấu để tiện xử lý
-    conversations[user].append({"role": "user", "content": normalized_msg})
+    # Lưu cả bản gốc và bản không dấu để AI hiểu
+    conversations[user].append({
+        "role": "user",
+        "content": f"{msg}\n(Phiên bản không dấu: {normalized_msg})"
+    })
 
     try:
         response = client.chat.completions.create(
