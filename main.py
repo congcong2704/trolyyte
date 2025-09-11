@@ -1,67 +1,58 @@
-from fastapi import FastAPI, Request, UploadFile, File, Form
+from fastapi import FastAPI, Request, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
-import os
+import os, tempfile
 import google.generativeai as genai
 
 app = FastAPI()
-
-# CORS cho frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], allow_credentials=True,
     allow_methods=["*"], allow_headers=["*"],
 )
 
-# Gemini
-api_key = os.getenv("GEMINI_API_KEY")
-if not api_key:
-    raise RuntimeError("❌ GEMINI_API_KEY chưa cấu hình!")
+api_key=os.getenv("GEMINI_API_KEY")
+if not api_key: raise RuntimeError("❌ GEMINI_API_KEY chưa được cấu hình!")
 genai.configure(api_key=api_key)
 
-model_text = genai.GenerativeModel("gemini-1.5-pro")
-model_multimodal = genai.GenerativeModel("gemini-1.5-flash")
+model_pro=genai.GenerativeModel("gemini-1.5-pro")
+model_flash=genai.GenerativeModel("gemini-1.5-flash")
 
-appointments = []
-conversations = {}
+appointments=[]; conversations={}
 
 @app.post("/api/message")
-async def message(req: Request):
-    data = await req.json()
-    user = data.get("username")
-    msg = data.get("message")
-    if user not in conversations:
-        conversations[user] = []
-    conversations[user].append({"role": "user", "content": msg})
-    history = "\n".join([f"{m['role']}: {m['content']}" for m in conversations[user]])
-    response = model_text.generate_content(history)
-    reply = response.text
-    conversations[user].append({"role": "assistant", "content": reply})
-    return {"reply": reply}
+async def message(username: str=Form(...), message: str=Form(""), files: list[UploadFile]=[]):
+    if username not in conversations:
+        conversations[username]=[{"role":"system","content":"Bạn là trợ lí y tế hữu ích"}]
+    if message: conversations[username].append({"role":"user","content":message})
+
+    parts=[]
+    if message: parts.append(message)
+    for f in files:
+        tmp=tempfile.NamedTemporaryFile(delete=False); tmp.write(await f.read()); tmp.close()
+        uploaded=genai.upload_file(tmp.name); parts.append(uploaded)
+
+    history_text="\n".join([("Người dùng" if m["role"]=="user" else "Trợ lý")+": "+m["content"] for m in conversations[username]])
+    try:
+        response=model_pro.generate_content([history_text]+parts); reply=response.text
+    except Exception:
+        response=model_flash.generate_content([history_text]+parts); reply=response.text
+    conversations[username].append({"role":"assistant","content":reply})
+    return {"reply":reply}
 
 @app.post("/api/upload")
-async def upload(username: str = Form(...), file: UploadFile = File(...)):
-    content = await file.read()
-    # Tạo tài nguyên hình ảnh/file cho Gemini
-    try:
-        response = model_multimodal.generate_content([
-            f"Người dùng {username} đã gửi file {file.filename}, hãy phân tích nội dung:",
-            {"mime_type": file.content_type, "data": content}
-        ])
-        reply = response.text
-    except Exception as e:
-        reply = f"Lỗi xử lý file: {e}"
-    return {"reply": reply}
+async def upload(username: str=Form(...), file: UploadFile=None):
+    tmp=tempfile.NamedTemporaryFile(delete=False); tmp.write(await file.read()); tmp.close()
+    uploaded=genai.upload_file(tmp.name)
+    response=model_pro.generate_content([uploaded,"Hãy phiên âm hoặc tóm tắt nội dung giọng nói này."])
+    return {"reply":response.text}
 
 @app.get("/api/appointments")
-async def get_appts(user: str):
-    return {"appointments": [a for a in appointments if a["user"] == user]}
+async def get_appts(user:str):
+    return {"appointments":[a for a in appointments if a["user"]==user]}
 
 @app.post("/api/book")
-async def book(req: Request):
-    data = await req.json()
-    appt = {
-        "user": data["user"], "clinic": data["clinic"],
-        "date": data["date"], "time": data["time"],
-    }
+async def book(req:Request):
+    data=await req.json()
+    appt={"user":data["user"],"clinic":data["clinic"],"date":data["date"],"time":data["time"]}
     appointments.append(appt)
-    return {"message": "Đặt lịch thành công", "appointment": appt}
+    return {"message":"Đặt lịch thành công","appointment":appt}
