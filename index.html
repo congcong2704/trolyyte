@@ -133,10 +133,12 @@
     // Send message
     sendBtn.addEventListener('click', sendMessage);
     userInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault(); // không xuống dòng
         sendMessage();
       }
     });
+
 
 
     function addMsg(role, text) {
