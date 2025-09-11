@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Trợ lí Y tế</title>
   <!-- Tailwind via CDN -->
-   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -74,12 +74,10 @@
               <div>
                 <label for="date" class="block mb-2">Ngày khám</label>
                 <input type="date" id="date" name="date" class="w-full p-2 border rounded" required>
-
               </div>
               <div>
                 <label for="time" class="block mb-2">Giờ khám</label>
                 <input type="time" id="time" name="time" class="w-full p-2 border rounded" required>
-
               </div>
             </div>
             <button type="submit" class="w-full px-3 py-2 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500">Đặt lịch</button>
@@ -87,15 +85,11 @@
         </div>
       </aside>
     </div>
-
-    <!-- Footer -->
-   
   </div>
 
   <script>
     // ====== CONFIG – chỉnh nếu backend của bạn chạy ở port khác ======
-    const API_BASE = " https://trolyyte-2.onrender.com";
- // cùng origin. Ví dụ chạy FastAPI tại http://localhost:8000 và phục vụ file này ở cùng origin.
+    const API_BASE = "https://trolyyte-2.onrender.com";
 
     // ====== UI helpers ======
     const chatHistory = document.getElementById('chatHistory');
@@ -134,8 +128,8 @@
     sendBtn.addEventListener('click', sendMessage);
     userInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault(); // không xuống dòng
-        sendMessage();
+        e.preventDefault();   // chặn xuống dòng
+        sendMessage();        // gửi tin nhắn
       }
     });
 
@@ -146,7 +140,6 @@
       const bubble = document.createElement('div');
       bubble.className = `max-w-[85%] px-3 py-2 rounded-2xl shadow-sm border text-sm whitespace-pre-wrap ${role === 'user' ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'}`;
       bubble.innerHTML = marked.parse(text);
-
 
       wrap.appendChild(bubble);
       chatHistory.appendChild(wrap);
@@ -261,6 +254,7 @@
         alert('Đặt lịch thất bại.');
       }
     });
+
     // Auto-load appointments once if username exists
     if (persistedName) {
       setTimeout(loadAppointments, 300);
@@ -268,4 +262,3 @@
   </script>
 </body>
 </html>
-    
