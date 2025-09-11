@@ -1,11 +1,12 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-import os
 import google.generativeai as genai
+import shutil
+import os
 
 app = FastAPI()
 
-# Cho phép frontend (index.html) gọi API
+# Cho phép CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,20 +15,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Cấu hình Gemini ---
-api_key = os.getenv("GEMINI_API_KEY")
-if not api_key:
-    raise RuntimeError("❌ GEMINI_API_KEY chưa được cấu hình trong biến môi trường!")
-
-genai.configure(api_key=api_key)
-
-# Models
-model_pro = genai.GenerativeModel("gemini-1.5-pro")
-model_flash = genai.GenerativeModel("gemini-1.5-flash")
+# Cấu hình Gemini
+genai.configure(api_key=os.getenv("GEMINI_API_KEY", "AIza..."))  # thay API key
 
 appointments = []
 conversations = {}
-
 
 @app.post("/api/message")
 async def message(req: Request):
@@ -39,30 +31,43 @@ async def message(req: Request):
         conversations[user] = [
             {"role": "system", "content": "Bạn là một trợ lí y tế hữu ích."}
         ]
-
     conversations[user].append({"role": "user", "content": msg})
 
-    # Gom lịch sử hội thoại thành text
-    history_text = ""
-    for m in conversations[user]:
-        role = "Người dùng" if m["role"] == "user" else "Trợ lý"
-        history_text += f"{role}: {m['content']}\n"
-
     try:
-        # Gọi gemini-1.5-pro trước
-        response = model_pro.generate_content(history_text)
+        model = genai.GenerativeModel("gemini-1.5-pro")
+        chat = model.start_chat(history=conversations[user])
+        response = chat.send_message(msg)
         reply = response.text
+        conversations[user].append({"role": "assistant", "content": reply})
     except Exception as e:
-        if "429" in str(e):  # hết quota → fallback sang flash
-            try:
-                response = model_flash.generate_content(history_text)
-                reply = response.text
-            except Exception as e2:
-                reply = f"Lỗi gọi Gemini Flash API: {e2}"
-        else:
-            reply = f"Lỗi gọi Gemini Pro API: {e}"
+        reply = f"Lỗi gọi Gemini API: {e}"
 
-    conversations[user].append({"role": "assistant", "content": reply})
+    return {"reply": reply}
+
+
+@app.post("/api/upload")
+async def upload(user: str = Form(...), file: UploadFile = File(...)):
+    try:
+        # Lưu file tạm
+        file_path = f"temp_{file.filename}"
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Xử lý bằng Gemini (nếu là ảnh thì gửi vào vision model)
+        if file.content_type.startswith("image/"):
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            response = model.generate_content([
+                {"mime_type": file.content_type, "data": open(file_path, "rb").read()},
+                "Hãy phân tích hình ảnh này liên quan đến y tế."
+            ])
+            reply = response.text
+        else:
+            reply = f"📎 Tệp {file.filename} đã được tải lên thành công."
+
+        os.remove(file_path)
+    except Exception as e:
+        reply = f"Lỗi xử lý file: {e}"
+
     return {"reply": reply}
 
 
