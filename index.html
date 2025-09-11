@@ -13,7 +13,6 @@
   <style>
     :root { color-scheme: light dark; }
     body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, "Apple Color Emoji","Segoe UI Emoji"; }
-    /* Simple scrollbar for history */
     .scrollbar-thin { scrollbar-width: thin; }
     .scrollbar-thin::-webkit-scrollbar { height: 8px; width: 8px; }
     .scrollbar-thin::-webkit-scrollbar-thumb { border-radius: 8px; }
@@ -41,7 +40,11 @@
         </div>
         <div class="border-t border-slate-100 dark:border-slate-700 p-3">
           <div class="flex gap-2 items-end">
-            <textarea id="userInput" rows="2" placeholder="Bạn muốn hỏi gì? (ví dụ: cách phòng cảm cúm, tìm phòng khám gần đây, đặt lịch...)" class="flex-1 resize-none px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring focus:ring-indigo-500/30"></textarea>
+            <textarea id="userInput" rows="2" placeholder="Bạn muốn hỏi gì? (Enter = gửi, Shift+Enter = xuống dòng)" class="flex-1 resize-none px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring focus:ring-indigo-500/30"></textarea>
+            
+            <!-- Nút micro -->
+            <button id="voiceBtn" class="px-3 py-2 rounded-2xl bg-rose-600 text-white font-semibold hover:bg-rose-500">🎤</button>
+
             <button id="sendBtn" class="px-4 py-2 rounded-2xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500">Gửi</button>
           </div>
           <div class="flex flex-wrap gap-2 mt-2 text-sm">
@@ -88,13 +91,12 @@
   </div>
 
   <script>
-    // ====== CONFIG – chỉnh nếu backend của bạn chạy ở port khác ======
     const API_BASE = "https://trolyyte-2.onrender.com";
 
-    // ====== UI helpers ======
     const chatHistory = document.getElementById('chatHistory');
     const userInput = document.getElementById('userInput');
     const sendBtn = document.getElementById('sendBtn');
+    const voiceBtn = document.getElementById('voiceBtn');
     const usernameEl = document.getElementById('username');
     const saveNameBtn = document.getElementById('saveNameBtn');
     const refreshApptBtn = document.getElementById('refreshApptBtn');
@@ -128,8 +130,8 @@
     sendBtn.addEventListener('click', sendMessage);
     userInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();   // chặn xuống dòng
-        sendMessage();        // gửi tin nhắn
+        e.preventDefault(); 
+        sendMessage();
       }
     });
 
@@ -233,17 +235,6 @@
         });
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
-        // ✅ Gửi thêm sang Google Sheets
-        await fetch("https://script.google.com/macros/s/AKfycbzWE79uuLGZMV9PiyruPfj4tGzJH5ttiZKg-EYztZgADslNojf9Bh5N4uHhtTljksDB/exec", {
-          method: "POST",
-          body: JSON.stringify({
-            name: payload.user,
-            clinic: payload.clinic,
-            date: payload.date,
-            time: payload.time
-          })
-        });
-
         toast(data.message || 'Đặt lịch thành công');
         clinicEl.value = '';
         dateEl.value = '';
@@ -255,9 +246,45 @@
       }
     });
 
-    // Auto-load appointments once if username exists
+    // Auto-load appointments if username exists
     if (persistedName) {
       setTimeout(loadAppointments, 300);
+    }
+
+    // ===== Voice Recognition =====
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.lang = "vi-VN";
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        voiceBtn.textContent = "🎙️ Đang nghe...";
+        voiceBtn.disabled = true;
+      };
+
+      recognition.onend = () => {
+        voiceBtn.textContent = "🎤";
+        voiceBtn.disabled = false;
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        userInput.value = (userInput.value + " " + transcript).trim();
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Voice error:", event.error);
+        alert("Không nhận diện được giọng nói. Thử lại nhé!");
+      };
+
+      voiceBtn.addEventListener("click", () => {
+        recognition.start();
+      });
+    } else {
+      voiceBtn.style.display = "none";
+      console.warn("Trình duyệt không hỗ trợ Web Speech API.");
     }
   </script>
 </body>
