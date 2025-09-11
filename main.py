@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from groq import Groq
-import json
+import google.generativeai as genai
 
 app = FastAPI()
 
@@ -14,7 +13,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-client = Groq(api_key="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")
+# --- Cấu hình Gemini ---
+genai.configure(api_key="AIzaSyA5wns2Z6xcze03KLL232AJ49gPj_YY5ts")
+model = genai.GenerativeModel("gemini-1.5-pro")
 
 appointments = []
 conversations = {}
@@ -33,15 +34,18 @@ async def message(req: Request):
     conversations[user].append({"role": "user", "content": msg})
 
     try:
-        response = client.chat.completions.create(
-            model="openai/gpt-oss-120b",
-            messages=conversations[user],
-            max_completion_tokens=2048
-        )
-        reply = response.choices[0].message.content
+        # Chuyển đổi lịch sử sang dạng text để gửi cho Gemini
+        history_text = ""
+        for m in conversations[user]:
+            role = "Người dùng" if m["role"] == "user" else "Trợ lý"
+            history_text += f"{role}: {m['content']}\n"
+
+        response = model.generate_content(history_text)
+        reply = response.text
+
         conversations[user].append({"role": "assistant", "content": reply})
     except Exception as e:
-        reply = f"Lỗi gọi Groq API: {e}"
+        reply = f"Lỗi gọi Gemini API: {e}"
 
     return {"reply": reply}
 
