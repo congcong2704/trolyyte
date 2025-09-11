@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+import os
 import google.generativeai as genai
 
 app = FastAPI()
@@ -14,11 +15,19 @@ app.add_middleware(
 )
 
 # --- Cấu hình Gemini ---
-genai.configure(api_key="AIzaSyA5wns2Z6xcze03KLL232AJ49gPj_YY5ts")
-model = genai.GenerativeModel("gemini-1.5-flash")
+api_key = os.getenv("GEMINI_API_KEY")
+if not api_key:
+    raise RuntimeError("❌ GEMINI_API_KEY chưa được cấu hình trong biến môi trường!")
+
+genai.configure(api_key=api_key)
+
+# Models
+model_pro = genai.GenerativeModel("gemini-1.5-pro")
+model_flash = genai.GenerativeModel("gemini-1.5-flash")
 
 appointments = []
 conversations = {}
+
 
 @app.post("/api/message")
 async def message(req: Request):
@@ -33,20 +42,27 @@ async def message(req: Request):
 
     conversations[user].append({"role": "user", "content": msg})
 
+    # Gom lịch sử hội thoại thành text
+    history_text = ""
+    for m in conversations[user]:
+        role = "Người dùng" if m["role"] == "user" else "Trợ lý"
+        history_text += f"{role}: {m['content']}\n"
+
     try:
-        # Chuyển đổi lịch sử sang dạng text để gửi cho Gemini
-        history_text = ""
-        for m in conversations[user]:
-            role = "Người dùng" if m["role"] == "user" else "Trợ lý"
-            history_text += f"{role}: {m['content']}\n"
-
-        response = model.generate_content(history_text)
+        # Gọi gemini-1.5-pro trước
+        response = model_pro.generate_content(history_text)
         reply = response.text
-
-        conversations[user].append({"role": "assistant", "content": reply})
     except Exception as e:
-        reply = f"Lỗi gọi Gemini API: {e}"
+        if "429" in str(e):  # hết quota → fallback sang flash
+            try:
+                response = model_flash.generate_content(history_text)
+                reply = response.text
+            except Exception as e2:
+                reply = f"Lỗi gọi Gemini Flash API: {e2}"
+        else:
+            reply = f"Lỗi gọi Gemini Pro API: {e}"
 
+    conversations[user].append({"role": "assistant", "content": reply})
     return {"reply": reply}
 
 
