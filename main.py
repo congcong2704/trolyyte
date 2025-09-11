@@ -15,7 +15,7 @@ app.add_middleware(
 
 # --- Cấu hình Gemini ---
 genai.configure(api_key="AIzaSyA5wns2Z6xcze03KLL232AJ49gPj_YY5ts")
-model = genai.GenerativeModel("gemini-1.5-pro")
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 appointments = []
 conversations = {}
