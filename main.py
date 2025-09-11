@@ -1,9 +1,9 @@
 from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-import os
-import google.generativeai as genai
-import shutil
 from pathlib import Path
+import os
+import shutil
+import google.generativeai as genai
 
 app = FastAPI()
 
@@ -29,19 +29,14 @@ model_flash = genai.GenerativeModel("gemini-1.5-flash")
 
 appointments = []
 conversations = {}
-
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
-
 
 @app.post("/api/message")
 async def message(req: Request):
     data = await req.json()
     user = data.get("username")
     msg = data.get("message")
-
-    if not user:
-        return {"reply": "❌ Thiếu username."}
 
     if user not in conversations:
         conversations[user] = [
@@ -57,7 +52,6 @@ async def message(req: Request):
         history_text += f"{role}: {m['content']}\n"
 
     try:
-        # Gọi gemini-1.5-pro trước
         response = model_pro.generate_content(history_text)
         reply = response.text
     except Exception as e:
@@ -73,30 +67,42 @@ async def message(req: Request):
     conversations[user].append({"role": "assistant", "content": reply})
     return {"reply": reply}
 
-
 @app.post("/api/upload")
 async def upload_file(user: str = Form(...), file: UploadFile = File(...)):
     """
-    API nhận file/ảnh từ frontend.
+    Nhận file từ frontend: nếu ảnh thì Gemini mô tả, nếu văn bản/PDF thì Gemini đọc nội dung.
     """
     if not user:
         return {"reply": "❌ Thiếu username."}
 
-    # Lưu file vào thư mục uploads
+    # Lưu file
     file_path = UPLOAD_DIR / file.filename
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # Tạo prompt cho Gemini
+    reply = ""
     try:
-        response = model_pro.generate_content(
-            [f"Người dùng {user} đã gửi một file: {file.filename}. Hãy phân tích nội dung hoặc đưa ra phản hồi phù hợp."]
-        )
-        reply = response.text
+        if file.content_type.startswith("image/"):
+            # Ảnh → Gemini Vision mô tả
+            with open(file_path, "rb") as img:
+                response = model_pro.generate_content(
+                    ["Hãy mô tả nội dung của bức ảnh này.", img]
+                )
+            reply = response.text
+        elif file.content_type in ["text/plain", "application/pdf"]:
+            # Văn bản/PDF → Gemini đọc file
+            with open(file_path, "r", errors="ignore") as f:
+                text = f.read()[:4000]  # tránh quá dài
+            response = model_pro.generate_content(
+                [f"Người dùng {user} đã gửi văn bản sau, hãy tóm tắt và giải thích:", text]
+            )
+            reply = response.text
+        else:
+            # File khác → chỉ xác nhận
+            reply = f"📂 Bạn đã gửi tệp: {file.filename}"
     except Exception as e:
-        reply = f"Đã nhận file {file.filename}, nhưng lỗi khi gọi Gemini: {e}"
+        reply = f"❌ Lỗi khi xử lý file {file.filename}: {e}"
 
-    # Lưu hội thoại
     if user not in conversations:
         conversations[user] = [
             {"role": "system", "content": "Bạn là một trợ lí y tế hữu ích."}
@@ -106,12 +112,10 @@ async def upload_file(user: str = Form(...), file: UploadFile = File(...)):
 
     return {"reply": reply}
 
-
 @app.get("/api/appointments")
 async def get_appts(user: str):
     user_appts = [a for a in appointments if a["user"] == user]
     return {"appointments": user_appts}
-
 
 @app.post("/api/book")
 async def book(req: Request):
