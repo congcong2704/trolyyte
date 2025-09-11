@@ -1,226 +1,118 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Trợ lí Y tế</title>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Health Assistant</title>
   <style>
-    body { font-family: Inter, sans-serif; }
-    .scrollbar-thin { scrollbar-width: thin; }
-    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
-    .scrollbar-thin::-webkit-scrollbar-thumb { background: #888; border-radius: 6px; }
+    body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; }
+    #chatbox { height: 80vh; overflow-y: auto; padding: 1rem; background: white; }
+    .msg { margin: .5rem 0; padding: .5rem .8rem; border-radius: 12px; max-width: 70%; }
+    .user { background: #0078ff; color: white; margin-left: auto; }
+    .bot { background: #eee; color: black; margin-right: auto; }
+    #input-area { display: flex; align-items: center; padding: .5rem; background: #fff; border-top: 1px solid #ccc; }
+    #userInput { flex: 1; border: none; outline: none; padding: .6rem; font-size: 1rem; border-radius: 20px; background: #f0f0f0; }
+    #sendBtn, #voiceBtn, #uploadBtn { background: none; border: none; margin-left: .5rem; cursor: pointer; font-size: 1.2rem; }
+    #uploadInput { display: none; }
   </style>
 </head>
-<body class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 min-h-screen">
-  <div class="max-w-5xl mx-auto p-4 sm:p-6">
-    <!-- Header -->
-    <header class="flex items-center justify-between gap-4 mb-4">
-      <h1 class="text-2xl font-bold">Trợ lí Y tế</h1>
-      <div class="flex gap-2">
-        <input id="username" type="text" placeholder="Tên của bạn" class="px-3 py-2 rounded-lg border" />
-        <button id="saveNameBtn" class="px-3 py-2 bg-indigo-600 text-white rounded-lg">Lưu tên</button>
-      </div>
-    </header>
+<body>
+  <div id="chatbox"></div>
 
-    <!-- Layout -->
-    <div class="grid md:grid-cols-3 gap-4">
-      <!-- Chat -->
-      <section class="md:col-span-2 bg-white dark:bg-slate-800 rounded-2xl border flex flex-col h-[75vh]">
-        <div id="chatHistory" class="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin"></div>
+  <div id="input-area">
+    <!-- nút upload -->
+    <button id="uploadBtn">➕</button>
+    <input type="file" id="uploadInput" />
 
-        <!-- Input -->
-        <div class="border-t p-3">
-          <div class="flex gap-2 items-end">
-            <textarea id="userInput" rows="2" placeholder="Nhập câu hỏi (Enter = gửi, Shift+Enter = xuống dòng)" class="flex-1 resize-none px-3 py-2 rounded-xl border"></textarea>
+    <!-- ô nhập -->
+    <input id="userInput" type="text" placeholder="Ask anything..." />
 
-            <!-- File upload -->
-            <input type="file" id="fileInput" class="hidden" />
-            <button id="fileBtn" class="px-3 py-2 rounded-xl bg-slate-200">📎</button>
+    <!-- nút voice -->
+    <button id="voiceBtn">🎤</button>
 
-            <!-- Image upload -->
-            <input type="file" id="imgInput" accept="image/*" class="hidden" />
-            <button id="imgBtn" class="px-3 py-2 rounded-xl bg-slate-200">📷</button>
-
-            <!-- Voice -->
-            <button id="voiceBtn" class="px-3 py-2 rounded-xl bg-rose-600 text-white">🎤</button>
-
-            <!-- Send -->
-            <button id="sendBtn" class="px-4 py-2 rounded-xl bg-indigo-600 text-white">Gửi</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- Appointment -->
-      <aside class="bg-white dark:bg-slate-800 rounded-2xl border p-4 space-y-4 h-[75vh] overflow-y-auto scrollbar-thin">
-        <h2 class="font-semibold">Lịch hẹn</h2>
-        <button id="refreshApptBtn" class="px-3 py-1 rounded-lg bg-slate-200">Tải lịch</button>
-        <ul id="apptList" class="space-y-2"></ul>
-
-        <hr class="my-2" />
-        <h2 class="font-semibold">Đặt lịch</h2>
-        <form id="bookForm" class="space-y-2">
-          <input id="clinic" type="text" placeholder="Phòng khám" class="w-full px-3 py-2 rounded-lg border" required />
-          <input id="date" type="date" class="w-full px-3 py-2 rounded-lg border" required />
-          <input id="time" type="time" class="w-full px-3 py-2 rounded-lg border" required />
-          <button type="submit" class="w-full px-3 py-2 bg-emerald-600 text-white rounded-lg">Đặt lịch</button>
-        </form>
-      </aside>
-    </div>
+    <!-- nút send -->
+    <button id="sendBtn">📤</button>
   </div>
 
   <script>
-    const API_BASE = "https://trolyyte-2.onrender.com";
-
-    const chatHistory = document.getElementById("chatHistory");
+    const chatbox = document.getElementById("chatbox");
     const userInput = document.getElementById("userInput");
     const sendBtn = document.getElementById("sendBtn");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const uploadInput = document.getElementById("uploadInput");
     const voiceBtn = document.getElementById("voiceBtn");
-    const fileBtn = document.getElementById("fileBtn");
-    const imgBtn = document.getElementById("imgBtn");
-    const fileInput = document.getElementById("fileInput");
-    const imgInput = document.getElementById("imgInput");
-    const usernameEl = document.getElementById("username");
-    const saveNameBtn = document.getElementById("saveNameBtn");
-    const apptList = document.getElementById("apptList");
-    const refreshApptBtn = document.getElementById("refreshApptBtn");
-    const bookForm = document.getElementById("bookForm");
-    const clinicEl = document.getElementById("clinic");
-    const dateEl = document.getElementById("date");
-    const timeEl = document.getElementById("time");
 
-    // Save/load username
-    if (localStorage.getItem("health_username")) {
-      usernameEl.value = localStorage.getItem("health_username");
+    const username = "user1"; // tạm cố định
+
+    function appendMessage(content, sender) {
+      const div = document.createElement("div");
+      div.className = "msg " + sender;
+      div.textContent = content;
+      chatbox.appendChild(div);
+      chatbox.scrollTop = chatbox.scrollHeight;
     }
-    saveNameBtn.addEventListener("click", () => {
-      if (!usernameEl.value.trim()) return alert("Nhập tên!");
-      localStorage.setItem("health_username", usernameEl.value.trim());
-      toast("Đã lưu tên!");
-    });
 
-    // Enter to send
-    userInput.addEventListener("keydown", (e) => {
+    async function sendMessage() {
+      const msg = userInput.value.trim();
+      if (!msg) return;
+      appendMessage(msg, "user");
+      userInput.value = "";
+
+      const res = await fetch("http://localhost:8000/api/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, message: msg })
+      });
+      const data = await res.json();
+      appendMessage(data.reply, "bot");
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+    userInput.addEventListener("keydown", e => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         sendMessage();
       }
     });
-    sendBtn.addEventListener("click", sendMessage);
 
-    // File & Image
-    fileBtn.addEventListener("click", () => fileInput.click());
-    imgBtn.addEventListener("click", () => imgInput.click());
-    fileInput.addEventListener("change", handleFileUpload);
-    imgInput.addEventListener("change", handleFileUpload);
-
-    async function handleFileUpload(e) {
-      const file = e.target.files[0];
+    // Upload file
+    uploadBtn.addEventListener("click", () => uploadInput.click());
+    uploadInput.addEventListener("change", async () => {
+      const file = uploadInput.files[0];
       if (!file) return;
-      addMsg("user", "📎 Đã gửi tệp: " + file.name);
+      appendMessage("📎 " + file.name, "user");
+
       const formData = new FormData();
+      formData.append("user", username);
       formData.append("file", file);
-      formData.append("user", usernameEl.value.trim());
-      try {
-        const res = await fetch(`${API_BASE}/api/upload`, { method: "POST", body: formData });
-        const data = await res.json();
-        addMsg("assistant", data.reply || "Đã nhận tệp.");
-      } catch {
-        addMsg("assistant", "Lỗi tải tệp.");
-      }
-    }
 
-    function addMsg(role, text) {
-      const wrap = document.createElement("div");
-      wrap.className = `flex ${role === "user" ? "justify-end" : "justify-start"}`;
-      const bubble = document.createElement("div");
-      bubble.className = `px-3 py-2 rounded-xl border max-w-[80%] whitespace-pre-wrap ${role === "user" ? "bg-indigo-600 text-white" : "bg-slate-100"}`;
-      bubble.innerHTML = marked.parse(text);
-      wrap.appendChild(bubble);
-      chatHistory.appendChild(wrap);
-      chatHistory.scrollTop = chatHistory.scrollHeight;
-    }
-
-    async function sendMessage() {
-      const name = usernameEl.value.trim();
-      const msg = userInput.value.trim();
-      if (!name) return alert("Nhập tên trước!");
-      if (!msg) return;
-      addMsg("user", msg);
-      userInput.value = "";
-      try {
-        const res = await fetch(`${API_BASE}/api/message`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: name, message: msg }),
-        });
-        const data = await res.json();
-        addMsg("assistant", data.reply || "");
-      } catch {
-        addMsg("assistant", "Lỗi gọi API.");
-      }
-    }
-
-    // Appointments
-    refreshApptBtn.addEventListener("click", loadAppointments);
-    async function loadAppointments() {
-      const name = usernameEl.value.trim();
-      if (!name) return alert("Nhập tên!");
-      apptList.innerHTML = "<li>Đang tải...</li>";
-      try {
-        const res = await fetch(`${API_BASE}/api/appointments?user=${encodeURIComponent(name)}`);
-        const data = await res.json();
-        apptList.innerHTML = "";
-        if (!data.appointments.length) return (apptList.innerHTML = "<li>Không có lịch hẹn</li>");
-        data.appointments.forEach(a => {
-          const li = document.createElement("li");
-          li.className = "p-2 rounded bg-slate-100";
-          li.innerHTML = `${a.clinic} - ${a.date} ${a.time}`;
-          apptList.appendChild(li);
-        });
-      } catch { apptList.innerHTML = "<li>Lỗi tải lịch</li>"; }
-    }
-
-    bookForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const payload = {
-        user: usernameEl.value.trim(),
-        clinic: clinicEl.value.trim(),
-        date: dateEl.value,
-        time: timeEl.value,
-      };
-      try {
-        const res = await fetch(`${API_BASE}/api/book`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        toast("Đặt lịch thành công!");
-        loadAppointments();
-      } catch { toast("Đặt lịch thất bại!"); }
+      const res = await fetch("http://localhost:8000/api/upload", {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      appendMessage(data.reply, "bot");
     });
 
-    function toast(msg) {
-      const t = document.createElement("div");
-      t.className = "fixed bottom-4 left-1/2 -translate-x-1/2 bg-black text-white px-4 py-2 rounded";
-      t.textContent = msg;
-      document.body.appendChild(t);
-      setTimeout(() => t.remove(), 2000);
+    // Voice input
+    let recognition;
+    if ("webkitSpeechRecognition" in window) {
+      recognition = new webkitSpeechRecognition();
+      recognition.lang = "vi-VN"; // đổi sang "en-US" nếu cần
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        userInput.value = transcript;
+        sendMessage();
+      };
     }
 
-    // Voice Recognition
-    if ("webkitSpeechRecognition" in window) {
-      const recognition = new webkitSpeechRecognition();
-      recognition.lang = "vi-VN";
-      recognition.onresult = e => { userInput.value += e.results[0][0].transcript; };
-      recognition.onstart = () => voiceBtn.textContent = "🎙️...";
-      recognition.onend = () => voiceBtn.textContent = "🎤";
-      voiceBtn.addEventListener("click", () => recognition.start());
-    } else {
-      voiceBtn.style.display = "none";
-    }
+    voiceBtn.addEventListener("click", () => {
+      if (recognition) recognition.start();
+      else alert("Trình duyệt không hỗ trợ voice recognition");
+    });
   </script>
 </body>
 </html>
