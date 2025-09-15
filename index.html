@@ -268,16 +268,52 @@
       else toggleVoice(false);
     });
 
-    // ➕ Menu
+    // ➕ Menu + Upload
+    // input file ẩn
+    const hiddenFileInput = document.createElement("input");
+    hiddenFileInput.type = "file";
+    hiddenFileInput.className = "hidden";
+    document.body.appendChild(hiddenFileInput);
+
+    hiddenFileInput.addEventListener("change", async () => {
+      const name = (usernameEl.value || "").trim();
+      if (!name) { alert("Hãy nhập và lưu tên trước."); return; }
+      if (!hiddenFileInput.files.length) return;
+
+      const file = hiddenFileInput.files[0];
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("user", name);
+
+      addMsg("user", `📎 Đã chọn file: ${file.name}`);
+
+      try {
+        const res = await fetch(`${API_BASE}/api/upload`, {
+          method: "POST",
+          body: formData
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        addMsg("assistant", data.reply || "Upload thành công!");
+      } catch (err) {
+        console.error(err);
+        addMsg("assistant", "❌ Lỗi upload file.");
+      }
+    });
+
     moreBtn.addEventListener("click", () => {
       moreMenu.classList.toggle("hidden");
     });
     document.querySelectorAll(".menuItem").forEach(item => {
       item.addEventListener("click", () => {
         const action = item.dataset.action;
-        toast("Chọn: " + action);
         moreMenu.classList.add("hidden");
-        // TODO: bổ sung logic gọi backend tùy action
+
+        if (action === "upload") {
+          hiddenFileInput.click();
+        } else {
+          toast("Chọn: " + action);
+        }
       });
     });
   </script>
