@@ -1,270 +1,164 @@
+### FRONTEND: index.html
 <!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Trợ lí Y tế</title>
-  <!-- Tailwind via CDN -->
-   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    :root { color-scheme: light dark; }
-    body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, "Apple Color Emoji","Segoe UI Emoji"; }
-    /* Simple scrollbar for history */
+    body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans; }
     .scrollbar-thin { scrollbar-width: thin; }
-    .scrollbar-thin::-webkit-scrollbar { height: 8px; width: 8px; }
-    .scrollbar-thin::-webkit-scrollbar-thumb { border-radius: 8px; }
+    .scrollbar-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { border-radius: 8px; background: #cbd5e1; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100 min-h-screen">
-  <div class="max-w-5xl mx-auto p-4 sm:p-6">
-    <!-- Header -->
-    <header class="flex items-center justify-between gap-4 mb-4">
-      <div>
-        <h1 class="text-2xl sm:text-3xl font-bold">Trợ lí Y tế</h1>
-      </div>
-      <div class="flex items-center gap-2">
-        <input id="username" type="text" placeholder="Tên của bạn" class="px-3 py-2 rounded-xl bg-white/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring focus:ring-indigo-500/30" />
-        <button id="saveNameBtn" class="px-3 py-2 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-500">Lưu tên</button>
-      </div>
-    </header>
-
-    <!-- Main layout -->
-    <div class="grid md:grid-cols-3 gap-4">
-      <!-- Chat Panel -->
-      <section class="md:col-span-2 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col h-[72vh]">
-        <div id="chatHistory" class="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin">
-          <!-- Messages injected here -->
-        </div>
-        <div class="border-t border-slate-100 dark:border-slate-700 p-3">
-          <div class="flex gap-2 items-end">
-            <textarea id="userInput" rows="2" placeholder="Bạn muốn hỏi gì? (ví dụ: cách phòng cảm cúm, tìm phòng khám gần đây, đặt lịch...)" class="flex-1 resize-none px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring focus:ring-indigo-500/30"></textarea>
-            <button id="sendBtn" class="px-4 py-2 rounded-2xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500">Gửi</button>
-          </div>
-          <div class="flex flex-wrap gap-2 mt-2 text-sm">
-            <button class="quickCmd px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-700" data-text="xem lịch">Xem lịch</button>
-            <button class="quickCmd px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-700" data-text="đặt lịch">Đặt lịch</button>
-            <button class="quickCmd px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-700" data-text="định nghĩa cảm cúm">Định nghĩa bệnh</button>
-            <button class="quickCmd px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-700" data-text="phòng ngừa sốt xuất huyết">Phòng ngừa</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- Appointments & Booking -->
-      <aside class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 space-y-4 h-[72vh] overflow-y-auto scrollbar-thin">
-        <div>
-          <h2 class="font-semibold text-lg mb-2">Lịch hẹn của tôi</h2>
-          <div class="flex items-center gap-2 mb-2">
-            <button id="refreshApptBtn" class="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700">Tải lịch</button>
-          </div>
-          <ul id="apptList" class="space-y-2"></ul>
-        </div>
-        <hr class="border-slate-200 dark:border-slate-700" />
-        <div>
-          <h2 class="font-semibold text-lg mb-2">Đặt lịch nhanh</h2>
-          <form id="bookForm" class="space-y-3">
-            <div>
-              <label class="block text-sm mb-1">Phòng khám</label>
-              <input id="clinic" type="text" required placeholder="VD: Phòng khám Đa khoa ABC" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label for="date" class="block mb-2">Ngày khám</label>
-                <input type="date" id="date" name="date" class="w-full p-2 border rounded" required>
-
-              </div>
-              <div>
-                <label for="time" class="block mb-2">Giờ khám</label>
-                <input type="time" id="time" name="time" class="w-full p-2 border rounded" required>
-
-              </div>
-            </div>
-            <button type="submit" class="w-full px-3 py-2 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500">Đặt lịch</button>
-          </form>
-        </div>
-      </aside>
+<div class="max-w-5xl mx-auto p-4 sm:p-6">
+  <!-- Header -->
+  <header class="flex items-center justify-between gap-4 mb-4">
+    <h1 class="text-2xl sm:text-3xl font-bold">Trợ lí Y tế</h1>
+    <div class="flex items-center gap-2">
+      <input id="username" type="text" placeholder="Tên của bạn" class="px-3 py-2 rounded-xl bg-white/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring focus:ring-indigo-500/30" />
+      <button id="saveNameBtn" class="px-3 py-2 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-500">Lưu tên</button>
     </div>
+  </header>
 
-    <!-- Footer -->
-   
+  <!-- Main -->
+  <div class="grid md:grid-cols-3 gap-4">
+    <section class="md:col-span-2 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col h-[72vh]">
+      <div id="chatHistory" class="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin"></div>
+      <div class="border-t border-slate-100 dark:border-slate-700 p-3">
+        <div class="flex gap-2 items-end">
+          <textarea id="userInput" rows="2" placeholder="Bạn muốn hỏi gì?" class="flex-1 resize-none px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring focus:ring-indigo-500/30"></textarea>
+          <button id="sendBtn" class="px-4 py-2 rounded-2xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500">Gửi</button>
+          <button id="voiceBtn" class="px-4 py-2 rounded-2xl bg-emerald-600 text-white hover:bg-emerald-500">🎤</button>
+          <div class="relative">
+            <button id="attachBtn" class="px-4 py-2 rounded-2xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300">+</button>
+            <div id="fileMenu" class="hidden absolute bottom-10 left-0 bg-white dark:bg-slate-800 border rounded shadow-lg p-2 space-y-2">
+              <input type="file" id="fileInput" accept="image/*,.pdf,.doc,.docx,.txt" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Appointments -->
+    <aside class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 space-y-4 h-[72vh] overflow-y-auto scrollbar-thin">
+      <div>
+        <h2 class="font-semibold text-lg mb-2">Lịch hẹn của tôi</h2>
+        <button id="refreshApptBtn" class="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700 mb-2">Tải lịch</button>
+        <ul id="apptList" class="space-y-2"></ul>
+      </div>
+      <hr class="border-slate-200 dark:border-slate-700" />
+      <form id="bookForm" class="space-y-3">
+        <div><label>Phòng khám</label><input id="clinic" required class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700"></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label>Ngày khám</label><input type="date" id="date" required class="w-full p-2 border rounded"></div>
+          <div><label>Giờ khám</label><input type="time" id="time" required class="w-full p-2 border rounded"></div>
+        </div>
+        <button type="submit" class="w-full px-3 py-2 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500">Đặt lịch</button>
+      </form>
+    </aside>
   </div>
+</div>
 
-  <script>
-    // ====== CONFIG – chỉnh nếu backend của bạn chạy ở port khác ======
-    const API_BASE = " https://trolyyte.onrender.com";
- // cùng origin. Ví dụ chạy FastAPI tại http://localhost:8000 và phục vụ file này ở cùng origin.
+<script>
+const API_BASE = "https://trolyyte.onrender.com";
+const chatHistory = document.getElementById('chatHistory');
+const userInput = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+const usernameEl = document.getElementById('username');
+const saveNameBtn = document.getElementById('saveNameBtn');
+const refreshApptBtn = document.getElementById('refreshApptBtn');
+const apptList = document.getElementById('apptList');
+const clinicEl = document.getElementById('clinic');
+const dateEl = document.getElementById('date');
+const timeEl = document.getElementById('time');
+const bookForm = document.getElementById('bookForm');
+const voiceBtn = document.getElementById('voiceBtn');
+const attachBtn = document.getElementById('attachBtn');
+const fileMenu = document.getElementById('fileMenu');
+const fileInput = document.getElementById('fileInput');
 
-    // ====== UI helpers ======
-    const chatHistory = document.getElementById('chatHistory');
-    const userInput = document.getElementById('userInput');
-    const sendBtn = document.getElementById('sendBtn');
-    const usernameEl = document.getElementById('username');
-    const saveNameBtn = document.getElementById('saveNameBtn');
-    const refreshApptBtn = document.getElementById('refreshApptBtn');
-    const apptList = document.getElementById('apptList');
+// Toggle file menu
+attachBtn.addEventListener('click', ()=>{ fileMenu.classList.toggle('hidden'); });
 
-    const clinicEl = document.getElementById('clinic');
-    const dateEl = document.getElementById('date');
-    const timeEl = document.getElementById('time');
-    const bookForm = document.getElementById('bookForm');
+// Save/load username
+const persistedName = localStorage.getItem('health_username');
+if(persistedName) usernameEl.value = persistedName;
+saveNameBtn.addEventListener('click', ()=>{ localStorage.setItem('health_username', usernameEl.value.trim()); });
 
-    // Save/load username
-    const persistedName = localStorage.getItem('health_username');
-    if (persistedName) usernameEl.value = persistedName;
+// Chat functions
+function addMsg(role,text){
+  const wrap = document.createElement('div');
+  wrap.className = `flex ${role==='user'?'justify-end':'justify-start'}`;
+  const bubble = document.createElement('div');
+  bubble.className = `max-w-[85%] px-3 py-2 rounded-2xl shadow-sm border text-sm whitespace-pre-wrap ${role==='user'?'bg-indigo-600 text-white border-indigo-500':'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'}`;
+  bubble.innerHTML = marked.parse(text);
+  wrap.appendChild(bubble);
+  chatHistory.appendChild(wrap);
+  chatHistory.scrollTop = chatHistory.scrollHeight;
+}
 
-    saveNameBtn.addEventListener('click', () => {
-      const name = usernameEl.value.trim();
-      if (!name) { alert('Vui lòng nhập tên.'); return; }
-      localStorage.setItem('health_username', name);
-      toast('Đã lưu tên: ' + name);
+async function sendMessage(){
+  const name=usernameEl.value.trim(), msg=userInput.value.trim();
+  if(!name||!msg)return;
+  addMsg('user',msg); userInput.value='';
+  try{
+    const res=await fetch(`${API_BASE}/api/message`,{
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:name,message:msg})
     });
+    const data=await res.json();
+    addMsg('assistant',data.reply||'');
+  }catch(e){ addMsg('assistant','Lỗi khi gọi backend'); }
+}
+sendBtn.addEventListener('click',sendMessage);
+userInput.addEventListener('keydown', e=>{ if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)) sendMessage(); });
 
-    // Quick command buttons
-    document.querySelectorAll('.quickCmd').forEach(b => {
-      b.addEventListener('click', () => {
-        userInput.value = b.dataset.text;
-        userInput.focus();
-      });
-    });
+// Voice chat
+voiceBtn.addEventListener('click',async()=>{
+  const name=usernameEl.value.trim();
+  if(!name)return alert('Nhập tên trước');
+  const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+  const mediaRecorder = new MediaRecorder(stream);
+  let chunks=[];
+  mediaRecorder.ondataavailable = e => chunks.push(e.data);
+  mediaRecorder.start();
+  voiceBtn.textContent='■';
+  mediaRecorder.onstop=async()=>{
+    const blob = new Blob(chunks,{type:'audio/webm'});
+    const formData = new FormData();
+    formData.append('username',name);
+    formData.append('file',blob,'voice.webm');
+    const res = await fetch(`${API_BASE}/api/voice`,{method:'POST',body:formData});
+    const data = await res.json();
+    addMsg('assistant',data.reply||'');
+    voiceBtn.textContent='🎤';
+  };
+  setTimeout(()=>mediaRecorder.stop(),5000); // 5s ghi âm
+});
 
-    // Send message
-    sendBtn.addEventListener('click', sendMessage);
-    userInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-        sendMessage();
-      }
-    });
-
-    function addMsg(role, text) {
-      const wrap = document.createElement('div');
-      wrap.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
-
-      const bubble = document.createElement('div');
-      bubble.className = `max-w-[85%] px-3 py-2 rounded-2xl shadow-sm border text-sm whitespace-pre-wrap ${role === 'user' ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'}`;
-      bubble.innerHTML = marked.parse(text);
-
-
-      wrap.appendChild(bubble);
-      chatHistory.appendChild(wrap);
-      chatHistory.scrollTop = chatHistory.scrollHeight;
-    }
-
-    function toast(msg) {
-      const t = document.createElement('div');
-      t.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2 rounded-xl text-sm shadow-lg';
-      t.textContent = msg;
-      document.body.appendChild(t);
-      setTimeout(() => t.remove(), 2200);
-    }
-
-    async function sendMessage() {
-      const name = (usernameEl.value || '').trim();
-      const message = (userInput.value || '').trim();
-      if (!name) { alert('Hãy nhập và lưu tên trước.'); return; }
-      if (!message) return;
-
-      addMsg('user', message);
-      userInput.value = '';
-
-      try {
-        const res = await fetch(`${API_BASE}/api/message`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: name, message })
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        addMsg('assistant', data.reply || '');
-      } catch (err) {
-        console.error(err);
-        addMsg('assistant', 'Đã có lỗi xảy ra khi gọi backend.');
-      }
-    }
-
-    // Load appointments
-    async function loadAppointments() {
-      const name = (usernameEl.value || '').trim();
-      if (!name) { alert('Hãy nhập và lưu tên trước.'); return; }
-      apptList.innerHTML = '<li class="text-slate-500">Đang tải...</li>';
-      try {
-        const res = await fetch(`${API_BASE}/api/appointments?user=${encodeURIComponent(name)}`);
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        renderAppointments(data.appointments || []);
-      } catch (err) {
-        console.error(err);
-        apptList.innerHTML = '<li class="text-rose-500">Không tải được lịch hẹn.</li>';
-      }
-    }
-
-    function renderAppointments(list) {
-      apptList.innerHTML = '';
-      if (!list.length) {
-        apptList.innerHTML = '<li class="text-slate-500">Bạn chưa có lịch hẹn nào.</li>';
-        return;
-      }
-      for (const a of list) {
-        const li = document.createElement('li');
-        li.className = 'p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700';
-        li.innerHTML = `<div class="font-medium">${a.clinic}</div>
-                        <div class="text-sm text-slate-500">${a.date} ${a.time}</div>`;
-        apptList.appendChild(li);
-      }
-    }
-
-    refreshApptBtn.addEventListener('click', loadAppointments);
-
-    // Book form
-    bookForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const name = (usernameEl.value || '').trim();
-      if (!name) { alert('Hãy nhập và lưu tên trước.'); return; }
-
-      const payload = {
-        user: name,
-        clinic: clinicEl.value.trim(),
-        date: dateEl.value.trim(),
-        time: timeEl.value.trim(),
-      };
-      if (!payload.clinic || !payload.date || !payload.time) { alert('Điền đủ thông tin.'); return; }
-
-      try {
-        const res = await fetch(`${API_BASE}/api/book`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        // ✅ Gửi thêm sang Google Sheets
-        await fetch("https://script.google.com/macros/s/AKfycbzWE79uuLGZMV9PiyruPfj4tGzJH5ttiZKg-EYztZgADslNojf9Bh5N4uHhtTljksDB/exec", {
-          method: "POST",
-          body: JSON.stringify({
-            name: payload.user,
-            clinic: payload.clinic,
-            date: payload.date,
-            time: payload.time
-          })
-        });
-
-        toast(data.message || 'Đặt lịch thành công');
-        clinicEl.value = '';
-        dateEl.value = '';
-        timeEl.value = '';
-        loadAppointments();
-      } catch (err) {
-        console.error(err);
-        alert('Đặt lịch thất bại.');
-      }
-    });
-    // Auto-load appointments once if username exists
-    if (persistedName) {
-      setTimeout(loadAppointments, 300);
-    }
-  </script>
+// File upload
+fileInput.addEventListener('change',async()=>{
+  const name=usernameEl.value.trim();
+  if(!name)return alert('Nhập tên trước');
+  const file=fileInput.files[0];
+  if(!file)return;
+  const formData=new FormData();
+  formData.append('username',name);
+  formData.append('file',file);
+  formData.append('message',userInput.value.trim());
+  const res=await fetch(`${API_BASE}/api/message-with-file`,{method:'POST',body:formData});
+  const data=await res.json();
+  addMsg('assistant',data.reply||'');
+  fileInput.value='';
+  fileMenu.classList.add('hidden');
+});
+</script>
 </body>
 </html>
-    
