@@ -1,7 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import os
-from google import genai  # Thư viện mới google-genai
+import google.generativeai as genai
+  # Thư viện mới google-genai
 
 app = FastAPI()
 
