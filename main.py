@@ -30,18 +30,18 @@ appointments = []
 conversations = {}
 
 
+# ---------------- CHAT CHÍNH ----------------
 @app.post("/api/message")
 async def message(req: Request):
     """
-    Nhận tin nhắn từ frontend (bao gồm voice-to-text từ trình duyệt),
-    gọi Gemini để tạo câu trả lời.
+    Nhận tin nhắn từ frontend, gọi Gemini để tạo câu trả lời.
     """
     data = await req.json()
-    user = data.get("username")
+    user = data.get("username", "guest")
     msg = data.get("message")
 
-    if not user or not msg:
-        return {"reply": "⚠️ Thiếu thông tin username hoặc message."}
+    if not msg:
+        return {"reply": "⚠️ Thiếu nội dung tin nhắn."}
 
     if user not in conversations:
         conversations[user] = [
@@ -73,6 +73,7 @@ async def message(req: Request):
     return {"reply": reply}
 
 
+# ---------------- LỊCH HẸN ----------------
 @app.get("/api/appointments")
 async def get_appts(user: str):
     """Trả về danh sách lịch hẹn của 1 user"""
@@ -92,3 +93,29 @@ async def book(req: Request):
     }
     appointments.append(appt)
     return {"message": "Đặt lịch thành công", "appointment": appt}
+
+
+# ---------------- MENU MỞ RỘNG ----------------
+@app.post("/api/file")
+async def file_action(req: Request):
+    return {"reply": "📎 Bạn đã chọn tính năng *Thêm ảnh & tệp* (chưa triển khai)."}
+
+
+@app.post("/api/study")
+async def study_action(req: Request):
+    return {"reply": "📖 Đây là chế độ *Học tập*. Bạn muốn học về chủ đề nào?"}
+
+
+@app.post("/api/image")
+async def image_action(req: Request):
+    return {"reply": "🎨 Tính năng *Tạo hình ảnh* sẽ được bổ sung sau."}
+
+
+@app.post("/api/think")
+async def think_action(req: Request):
+    return {"reply": "💡 Tôi sẽ *suy nghĩ chi tiết hơn* để đưa ra câu trả lời tốt hơn."}
+
+
+@app.post("/api/research")
+async def research_action(req: Request):
+    return {"reply": "🔍 Tính năng *Nghiên cứu sâu* đang được phát triển."}
