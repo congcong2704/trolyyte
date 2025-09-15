@@ -35,14 +35,16 @@
     <div class="grid md:grid-cols-3 gap-4">
       <!-- Chat Panel -->
       <section class="md:col-span-2 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col h-[72vh]">
-        <div id="chatHistory" class="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin"></div>
+        <div id="chatHistory" class="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin">
+          <!-- Messages injected here -->
+        </div>
         <div class="border-t border-slate-100 dark:border-slate-700 p-3">
           <div class="flex gap-2 items-end">
             <textarea id="userInput" rows="2" placeholder="Bạn muốn hỏi gì?" class="flex-1 resize-none px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring focus:ring-indigo-500/30"></textarea>
             <button id="sendBtn" class="px-4 py-2 rounded-2xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500">Gửi</button>
-            <!-- Gửi ảnh -->
-            <input type="file" id="imageInput" accept="image/*" class="hidden" />
-            <button id="sendImageBtn" class="px-4 py-2 rounded-2xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500">📷</button>
+            <button id="voiceBtn" class="px-4 py-2 rounded-2xl bg-rose-600 text-white font-semibold hover:bg-rose-500">
+              🎤
+            </button>
           </div>
           <div class="flex flex-wrap gap-2 mt-2 text-sm">
             <button class="quickCmd px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-700" data-text="xem lịch">Xem lịch</button>
@@ -101,8 +103,7 @@
     const dateEl = document.getElementById('date');
     const timeEl = document.getElementById('time');
     const bookForm = document.getElementById('bookForm');
-    const imageInput = document.getElementById("imageInput");
-    const sendImageBtn = document.getElementById("sendImageBtn");
+    const voiceBtn = document.getElementById('voiceBtn');
 
     const persistedName = localStorage.getItem('health_username');
     if (persistedName) usernameEl.value = persistedName;
@@ -153,10 +154,8 @@
       const message = (userInput.value || '').trim();
       if (!name) { alert('Hãy nhập và lưu tên trước.'); return; }
       if (!message) return;
-
       addMsg('user', message);
       userInput.value = '';
-
       try {
         const res = await fetch(`${API_BASE}/api/message`, {
           method: 'POST',
@@ -196,8 +195,7 @@
       for (const a of list) {
         const li = document.createElement('li');
         li.className = 'p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700';
-        li.innerHTML = `<div class="font-medium">${a.clinic}</div>
-                        <div class="text-sm text-slate-500">${a.date} ${a.time}</div>`;
+        li.innerHTML = `<div class="font-medium">${a.clinic}</div><div class="text-sm text-slate-500">${a.date} ${a.time}</div>`;
         apptList.appendChild(li);
       }
     }
@@ -208,15 +206,8 @@
       e.preventDefault();
       const name = (usernameEl.value || '').trim();
       if (!name) { alert('Hãy nhập và lưu tên trước.'); return; }
-
-      const payload = {
-        user: name,
-        clinic: clinicEl.value.trim(),
-        date: dateEl.value.trim(),
-        time: timeEl.value.trim(),
-      };
+      const payload = { user: name, clinic: clinicEl.value.trim(), date: dateEl.value.trim(), time: timeEl.value.trim() };
       if (!payload.clinic || !payload.date || !payload.time) { alert('Điền đủ thông tin.'); return; }
-
       try {
         const res = await fetch(`${API_BASE}/api/book`, {
           method: 'POST',
@@ -225,17 +216,12 @@
         });
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
-
-        // Ghi thêm vào Google Sheets
         await fetch("https://script.google.com/macros/s/AKfycbzWE79uuLGZMV9PiyruPfj4tGzJH5ttiZKg-EYztZgADslNojf9Bh5N4uHhtTljksDB/exec", {
           method: "POST",
           body: JSON.stringify(payload)
         });
-
         toast(data.message || 'Đặt lịch thành công');
-        clinicEl.value = '';
-        dateEl.value = '';
-        timeEl.value = '';
+        clinicEl.value = ''; dateEl.value = ''; timeEl.value = '';
         loadAppointments();
       } catch (err) {
         console.error(err);
@@ -243,30 +229,44 @@
       }
     });
 
-    // Xử lý gửi ảnh
-    sendImageBtn.addEventListener("click", () => imageInput.click());
-    imageInput.addEventListener("change", async () => {
-      const file = imageInput.files[0];
-      if (!file) return;
-      const formData = new FormData();
-      formData.append("file", file);
-      addMsg("user", "📷 Bạn vừa gửi ảnh: " + file.name);
+    if (persistedName) setTimeout(loadAppointments, 300);
 
-      try {
-        const res = await fetch(`${API_BASE}/api/image`, {
-          method: "POST",
-          body: formData,
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        addMsg("assistant", data.reply || "Không có phản hồi từ AI.");
-      } catch (err) {
-        console.error(err);
-        addMsg("assistant", "❌ Gửi ảnh thất bại.");
+    // 🎤 Voice Chat
+    let recognition;
+    if ("webkitSpeechRecognition" in window) {
+      recognition = new webkitSpeechRecognition();
+      recognition.lang = "vi-VN";
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        userInput.value = transcript;
+        sendMessage();
+      };
+
+      recognition.onerror = (e) => { toast("Lỗi giọng nói: " + e.error); toggleVoice(false); };
+      recognition.onend = () => { toggleVoice(false); };
+    }
+
+    function toggleVoice(start) {
+      if (!recognition) return;
+      if (start) {
+        recognition.start();
+        voiceBtn.textContent = "⏹️"; // dừng
+      } else {
+        recognition.stop();
+        voiceBtn.textContent = "🎤"; // mic
+      }
+    }
+
+    voiceBtn.addEventListener("click", () => {
+      if (voiceBtn.textContent === "🎤") {
+        toggleVoice(true);
+      } else {
+        toggleVoice(false);
       }
     });
-
-    if (persistedName) setTimeout(loadAppointments, 300);
   </script>
 </body>
 </html>
