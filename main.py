@@ -1,7 +1,9 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import google.generativeai as genai
+from pathlib import Path
+import shutil
 
 app = FastAPI()
 
@@ -29,13 +31,14 @@ model_flash = genai.GenerativeModel("gemini-1.5-flash")
 appointments = []
 conversations = {}
 
+# Tạo thư mục lưu file upload
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
+
 
 # ---------------- CHAT CHÍNH ----------------
 @app.post("/api/message")
 async def message(req: Request):
-    """
-    Nhận tin nhắn từ frontend, gọi Gemini để tạo câu trả lời.
-    """
     data = await req.json()
     user = data.get("username", "guest")
     msg = data.get("message")
@@ -97,8 +100,22 @@ async def book(req: Request):
 
 # ---------------- MENU MỞ RỘNG ----------------
 @app.post("/api/file")
-async def file_action(req: Request):
-    return {"reply": "📎 Bạn đã chọn tính năng *Thêm ảnh & tệp* (chưa triển khai)."}
+async def file_action(file: UploadFile = File(...)):
+    """Upload file thật (ảnh, pdf, docx, txt, ...)"""
+    file_path = UPLOAD_DIR / file.filename
+
+    # Lưu file vào thư mục uploads/
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    size_kb = round(file_path.stat().st_size / 1024, 2)
+
+    return {
+        "reply": f"📎 Đã upload file **{file.filename}** ({size_kb} KB).",
+        "filename": file.filename,
+        "size_kb": size_kb,
+        "path": str(file_path),
+    }
 
 
 @app.post("/api/study")
