@@ -1,7 +1,12 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from groq import Groq
+import os
 import json
+from dotenv import load_dotenv
+import google.generativeai as genai
+
+# Load biến môi trường từ file .env
+load_dotenv()
 
 app = FastAPI()
 
@@ -14,7 +19,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-client = Groq(api_key="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")
+# Lấy API key từ biến môi trường
+api_key = os.getenv("GEMINI_API_KEY")
+genai.configure(api_key=api_key)
 
 appointments = []
 conversations = {}
@@ -27,21 +34,20 @@ async def message(req: Request):
 
     if user not in conversations:
         conversations[user] = [
-            {"role": "system", "content": "Bạn là một trợ lí y tế hữu ích."}
+            {"role": "user", "parts": "Bạn là một trợ lí y tế hữu ích."}
         ]
 
-    conversations[user].append({"role": "user", "content": msg})
+    conversations[user].append({"role": "user", "parts": msg})
 
     try:
-        response = client.chat.completions.create(
-            model="openai/gpt-oss-120b",
-            messages=conversations[user],
-            max_completion_tokens=2048
-        )
-        reply = response.choices[0].message.content
-        conversations[user].append({"role": "assistant", "content": reply})
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        chat = model.start_chat(history=conversations[user])
+        response = chat.send_message(msg)
+
+        reply = response.text
+        conversations[user].append({"role": "model", "parts": reply})
     except Exception as e:
-        reply = f"Lỗi gọi Groq API: {e}"
+        reply = f"Lỗi gọi Gemini API: {e}"
 
     return {"reply": reply}
 
