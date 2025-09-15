@@ -1,16 +1,15 @@
-from fastapi import FastAPI, Request, UploadFile, File
+from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 import os
-import google.generativeai as genai
-from pathlib import Path
 import shutil
+import google.generativeai as genai
 
 app = FastAPI()
 
-# Cho phép frontend (index.html) gọi API
+# CORS để cho frontend gọi API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -27,24 +26,23 @@ genai.configure(api_key=api_key)
 model_pro = genai.GenerativeModel("gemini-1.5-pro")
 model_flash = genai.GenerativeModel("gemini-1.5-flash")
 
-# Bộ nhớ tạm (có thể thay bằng DB sau)
+# Bộ nhớ tạm
 appointments = []
 conversations = {}
 
-# Tạo thư mục lưu file upload
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-# ---------------- CHAT CHÍNH ----------------
 @app.post("/api/message")
 async def message(req: Request):
+    """Nhận tin nhắn từ frontend, gọi Gemini để trả lời"""
     data = await req.json()
-    user = data.get("username", "guest")
+    user = data.get("username")
     msg = data.get("message")
 
-    if not msg:
-        return {"reply": "⚠️ Thiếu nội dung tin nhắn."}
+    if not user or not msg:
+        return {"reply": "⚠️ Thiếu thông tin username hoặc message."}
 
     if user not in conversations:
         conversations[user] = [
@@ -53,7 +51,6 @@ async def message(req: Request):
 
     conversations[user].append({"role": "user", "content": msg})
 
-    # Gom lịch sử hội thoại thành text
     history_text = ""
     for m in conversations[user]:
         role = "Người dùng" if m["role"] == "user" else "Trợ lý"
@@ -63,7 +60,7 @@ async def message(req: Request):
         response = model_pro.generate_content(history_text)
         reply = response.text
     except Exception as e:
-        if "429" in str(e):  # hết quota → fallback sang flash
+        if "429" in str(e):  # hết quota → fallback
             try:
                 response = model_flash.generate_content(history_text)
                 reply = response.text
@@ -76,7 +73,34 @@ async def message(req: Request):
     return {"reply": reply}
 
 
-# ---------------- LỊCH HẸN ----------------
+@app.post("/api/upload")
+async def upload_file(user: str = Form(...), file: UploadFile = File(...)):
+    """Nhận file từ người dùng và lưu vào thư mục uploads/"""
+    try:
+        file_path = os.path.join(UPLOAD_DIR, file.filename)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        reply = f"📎 File '{file.filename}' đã được tải lên thành công."
+
+        # Nếu là ảnh → gợi ý phân tích
+        if file.content_type.startswith("image/"):
+            reply += " Đây là ảnh, bạn có muốn tôi phân tích nội dung ảnh không?"
+
+        # Nếu là text → tóm tắt nội dung
+        elif file.content_type.startswith("text/"):
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read(500)
+            ai_resp = model_flash.generate_content(
+                f"Đây là nội dung file:\n{content}\n\nHãy tóm tắt ngắn gọn cho bệnh nhân."
+            )
+            reply += "\n📝 Tóm tắt: " + ai_resp.text
+
+        return {"reply": reply}
+    except Exception as e:
+        return {"reply": f"❌ Lỗi upload file: {e}"}
+
+
 @app.get("/api/appointments")
 async def get_appts(user: str):
     """Trả về danh sách lịch hẹn của 1 user"""
@@ -96,43 +120,3 @@ async def book(req: Request):
     }
     appointments.append(appt)
     return {"message": "Đặt lịch thành công", "appointment": appt}
-
-
-# ---------------- MENU MỞ RỘNG ----------------
-@app.post("/api/file")
-async def file_action(file: UploadFile = File(...)):
-    """Upload file thật (ảnh, pdf, docx, txt, ...)"""
-    file_path = UPLOAD_DIR / file.filename
-
-    # Lưu file vào thư mục uploads/
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    size_kb = round(file_path.stat().st_size / 1024, 2)
-
-    return {
-        "reply": f"📎 Đã upload file **{file.filename}** ({size_kb} KB).",
-        "filename": file.filename,
-        "size_kb": size_kb,
-        "path": str(file_path),
-    }
-
-
-@app.post("/api/study")
-async def study_action(req: Request):
-    return {"reply": "📖 Đây là chế độ *Học tập*. Bạn muốn học về chủ đề nào?"}
-
-
-@app.post("/api/image")
-async def image_action(req: Request):
-    return {"reply": "🎨 Tính năng *Tạo hình ảnh* sẽ được bổ sung sau."}
-
-
-@app.post("/api/think")
-async def think_action(req: Request):
-    return {"reply": "💡 Tôi sẽ *suy nghĩ chi tiết hơn* để đưa ra câu trả lời tốt hơn."}
-
-
-@app.post("/api/research")
-async def research_action(req: Request):
-    return {"reply": "🔍 Tính năng *Nghiên cứu sâu* đang được phát triển."}
