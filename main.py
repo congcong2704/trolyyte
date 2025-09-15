@@ -5,19 +5,19 @@ import google.generativeai as genai
 
 app = FastAPI()
 
-# === CORS để frontend gọi API ===
+# === CORS cho frontend GitHub Pages gọi ===
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://congcong2704.github.io"],  # bạn có thể đổi thành "https://yourusername.github.io"
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# === Lấy API Key Gemini từ biến môi trường ===
+# === Gemini API Key từ environment ===
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
-    raise ValueError("⚠️ Chưa cấu hình GEMINI_API_KEY trong environment variables!")
+    raise ValueError("⚠️ GEMINI_API_KEY chưa được cấu hình!")
 
 genai.configure(api_key=GEMINI_API_KEY)
 
@@ -35,10 +35,9 @@ async def message(req: Request):
     if not user or not msg:
         return {"reply": "Thiếu thông tin username hoặc message."}
 
-    # Khởi tạo conversation nếu chưa có
     if user not in conversations:
         conversations[user] = [
-            {"role": "system", "content": "Bạn là một trợ lí y tế hữu ích."}
+            {"role": "system", "content": "Bạn là trợ lí y tế hữu ích."}
         ]
 
     conversations[user].append({"role": "user", "content": msg})
@@ -50,19 +49,11 @@ async def message(req: Request):
             temperature=0.7,
             max_output_tokens=1024
         )
-
         reply = response.output_text if hasattr(response, "output_text") else "Không nhận được phản hồi từ Gemini."
         conversations[user].append({"role": "assistant", "content": reply})
-
     except Exception as e:
         reply = f"Lỗi gọi Gemini API: {e}"
-
-
-        # Lưu lại vào conversation
         conversations[user].append({"role": "assistant", "content": reply})
-
-    except Exception as e:
-        reply = f"Lỗi gọi Gemini API: {e}"
 
     return {"reply": reply}
 
@@ -84,6 +75,3 @@ async def book(req: Request):
     }
     appointments.append(appt)
     return {"message": "Đặt lịch thành công", "appointment": appt}
-
-# === Start command trên Render ===
-# uvicorn main:app --host 0.0.0.0 --port $PORT
