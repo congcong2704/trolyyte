@@ -218,9 +218,21 @@
       e.preventDefault();
       const name = (usernameEl.value || '').trim();
       if (!name) { alert('Hãy nhập và lưu tên trước.'); return; }
-      const payload = { user: name, clinic: clinicEl.value.trim(), date: dateEl.value.trim(), time: timeEl.value.trim() };
-      if (!payload.clinic || !payload.date || !payload.time) { alert('Điền đủ thông tin.'); return; }
+
+      const payload = { 
+        user: name, 
+        clinic: clinicEl.value.trim(), 
+        date: dateEl.value.trim(), 
+        time: timeEl.value.trim() 
+      };
+
+      if (!payload.clinic || !payload.date || !payload.time) { 
+        alert('Điền đủ thông tin.'); 
+        return; 
+      }
+
       try {
+    // gọi API backend để lưu appointment tạm (RAM)
         const res = await fetch(`${API_BASE}/api/book`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -228,19 +240,25 @@
         });
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
-        // lưu sang Google Sheets
+
+    // --- ghi sang Google Sheet qua Apps Script ---
         await fetch("https://script.google.com/macros/s/AKfycbzWE79uuLGZMV9PiyruPfj4tGzJH5ttiZKg-EYztZgADslNojf9Bh5N4uHhtTljksDB/exec", {
           method: "POST",
-          body: JSON.stringify(payload)
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)   // payload đã có user
         });
+
         toast(data.message || 'Đặt lịch thành công');
-        clinicEl.value = ''; dateEl.value = ''; timeEl.value = '';
+        clinicEl.value = ''; 
+        dateEl.value = ''; 
+        timeEl.value = '';
         loadAppointments();
       } catch (err) {
         console.error(err);
         alert('❌ Đặt lịch thất bại.');
       }
     });
+
     if (persistedName) setTimeout(loadAppointments, 300);
 
     // 🎤 Voice Recognition
