@@ -1,10 +1,11 @@
-from fastapi import FastAPI, Request, UploadFile, File
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import google.generativeai as genai
 
 app = FastAPI()
 
+# Cho phép frontend (index.html) gọi API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,14 +25,23 @@ genai.configure(api_key=api_key)
 model_pro = genai.GenerativeModel("gemini-1.5-pro")
 model_flash = genai.GenerativeModel("gemini-1.5-flash")
 
+# Bộ nhớ tạm (có thể thay bằng DB sau)
 appointments = []
 conversations = {}
 
+
 @app.post("/api/message")
 async def message(req: Request):
+    """
+    Nhận tin nhắn từ frontend (bao gồm voice-to-text từ trình duyệt),
+    gọi Gemini để tạo câu trả lời.
+    """
     data = await req.json()
     user = data.get("username")
     msg = data.get("message")
+
+    if not user or not msg:
+        return {"reply": "⚠️ Thiếu thông tin username hoặc message."}
 
     if user not in conversations:
         conversations[user] = [
@@ -40,6 +50,7 @@ async def message(req: Request):
 
     conversations[user].append({"role": "user", "content": msg})
 
+    # Gom lịch sử hội thoại thành text
     history_text = ""
     for m in conversations[user]:
         role = "Người dùng" if m["role"] == "user" else "Trợ lý"
@@ -49,7 +60,7 @@ async def message(req: Request):
         response = model_pro.generate_content(history_text)
         reply = response.text
     except Exception as e:
-        if "429" in str(e):
+        if "429" in str(e):  # hết quota → fallback sang flash
             try:
                 response = model_flash.generate_content(history_text)
                 reply = response.text
@@ -61,13 +72,17 @@ async def message(req: Request):
     conversations[user].append({"role": "assistant", "content": reply})
     return {"reply": reply}
 
+
 @app.get("/api/appointments")
 async def get_appts(user: str):
+    """Trả về danh sách lịch hẹn của 1 user"""
     user_appts = [a for a in appointments if a["user"] == user]
     return {"appointments": user_appts}
 
+
 @app.post("/api/book")
 async def book(req: Request):
+    """Đặt lịch hẹn mới"""
     data = await req.json()
     appt = {
         "user": data["user"],
@@ -77,18 +92,3 @@ async def book(req: Request):
     }
     appointments.append(appt)
     return {"message": "Đặt lịch thành công", "appointment": appt}
-
-# 🔹 API mới: Nhận ảnh từ frontend
-@app.post("/api/image")
-async def process_image(file: UploadFile = File(...)):
-    try:
-        contents = await file.read()
-        response = model_pro.generate_content(
-            [
-                {"mime_type": file.content_type, "data": contents},
-                {"text": "Mô tả chi tiết nội dung y tế trong ảnh này."}
-            ]
-        )
-        return {"reply": response.text}
-    except Exception as e:
-        return {"error": str(e)}
