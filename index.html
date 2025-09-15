@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Trợ lí Y tế</title>
   <!-- Tailwind via CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,6 +13,7 @@
   <style>
     :root { color-scheme: light dark; }
     body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, "Apple Color Emoji","Segoe UI Emoji"; }
+    /* Simple scrollbar for history */
     .scrollbar-thin { scrollbar-width: thin; }
     .scrollbar-thin::-webkit-scrollbar { height: 8px; width: 8px; }
     .scrollbar-thin::-webkit-scrollbar-thumb { border-radius: 8px; }
@@ -35,11 +36,12 @@
     <div class="grid md:grid-cols-3 gap-4">
       <!-- Chat Panel -->
       <section class="md:col-span-2 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col h-[72vh]">
-        <div id="chatHistory" class="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin"></div>
+        <div id="chatHistory" class="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin">
+          <!-- Messages injected here -->
+        </div>
         <div class="border-t border-slate-100 dark:border-slate-700 p-3">
           <div class="flex gap-2 items-end">
             <textarea id="userInput" rows="2" placeholder="Bạn muốn hỏi gì? (ví dụ: cách phòng cảm cúm, tìm phòng khám gần đây, đặt lịch...)" class="flex-1 resize-none px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring focus:ring-indigo-500/30"></textarea>
-            <button id="voiceBtn" class="px-3 py-2 rounded-2xl bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-slate-100 hover:bg-gray-300">🎤</button>
             <button id="sendBtn" class="px-4 py-2 rounded-2xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500">Gửi</button>
           </div>
           <div class="flex flex-wrap gap-2 mt-2 text-sm">
@@ -72,10 +74,12 @@
               <div>
                 <label for="date" class="block mb-2">Ngày khám</label>
                 <input type="date" id="date" name="date" class="w-full p-2 border rounded" required>
+
               </div>
               <div>
                 <label for="time" class="block mb-2">Giờ khám</label>
                 <input type="time" id="time" name="time" class="w-full p-2 border rounded" required>
+
               </div>
             </div>
             <button type="submit" class="w-full px-3 py-2 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500">Đặt lịch</button>
@@ -83,24 +87,31 @@
         </div>
       </aside>
     </div>
+
+    <!-- Footer -->
+   
   </div>
 
   <script>
-    const API_BASE = "https://trolyyte.onrender.com";
+    // ====== CONFIG – chỉnh nếu backend của bạn chạy ở port khác ======
+    const API_BASE = " https://trolyyte.onrender.com";
+ // cùng origin. Ví dụ chạy FastAPI tại http://localhost:8000 và phục vụ file này ở cùng origin.
 
+    // ====== UI helpers ======
     const chatHistory = document.getElementById('chatHistory');
     const userInput = document.getElementById('userInput');
     const sendBtn = document.getElementById('sendBtn');
-    const voiceBtn = document.getElementById('voiceBtn');
     const usernameEl = document.getElementById('username');
     const saveNameBtn = document.getElementById('saveNameBtn');
     const refreshApptBtn = document.getElementById('refreshApptBtn');
     const apptList = document.getElementById('apptList');
+
     const clinicEl = document.getElementById('clinic');
     const dateEl = document.getElementById('date');
     const timeEl = document.getElementById('time');
     const bookForm = document.getElementById('bookForm');
 
+    // Save/load username
     const persistedName = localStorage.getItem('health_username');
     if (persistedName) usernameEl.value = persistedName;
 
@@ -111,6 +122,7 @@
       toast('Đã lưu tên: ' + name);
     });
 
+    // Quick command buttons
     document.querySelectorAll('.quickCmd').forEach(b => {
       b.addEventListener('click', () => {
         userInput.value = b.dataset.text;
@@ -118,6 +130,7 @@
       });
     });
 
+    // Send message
     sendBtn.addEventListener('click', sendMessage);
     userInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -128,9 +141,12 @@
     function addMsg(role, text) {
       const wrap = document.createElement('div');
       wrap.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+
       const bubble = document.createElement('div');
       bubble.className = `max-w-[85%] px-3 py-2 rounded-2xl shadow-sm border text-sm whitespace-pre-wrap ${role === 'user' ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'}`;
       bubble.innerHTML = marked.parse(text);
+
+
       wrap.appendChild(bubble);
       chatHistory.appendChild(wrap);
       chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -168,6 +184,7 @@
       }
     }
 
+    // Load appointments
     async function loadAppointments() {
       const name = (usernameEl.value || '').trim();
       if (!name) { alert('Hãy nhập và lưu tên trước.'); return; }
@@ -200,6 +217,7 @@
 
     refreshApptBtn.addEventListener('click', loadAppointments);
 
+    // Book form
     bookForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const name = (usernameEl.value || '').trim();
@@ -221,7 +239,7 @@
         });
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
-
+        // ✅ Gửi thêm sang Google Sheets
         await fetch("https://script.google.com/macros/s/AKfycbzWE79uuLGZMV9PiyruPfj4tGzJH5ttiZKg-EYztZgADslNojf9Bh5N4uHhtTljksDB/exec", {
           method: "POST",
           body: JSON.stringify({
@@ -242,51 +260,9 @@
         alert('Đặt lịch thất bại.');
       }
     });
-
+    // Auto-load appointments once if username exists
     if (persistedName) {
       setTimeout(loadAppointments, 300);
-    }
-
-    // ===== Voice chat =====
-    let recognizing = false;
-    let recognition;
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition = new SpeechRecognition();
-      recognition.lang = 'vi-VN';
-      recognition.interimResults = true;
-      recognition.continuous = false;
-
-      recognition.onstart = () => {
-        recognizing = true;
-        voiceBtn.textContent = '⏹️';
-        toast('Đang nghe giọng nói...');
-      };
-      recognition.onresult = (event) => {
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          transcript += event.results[i][0].transcript;
-        }
-        userInput.value = transcript;
-      };
-      recognition.onerror = (event) => {
-        console.error(event.error);
-        toast('Lỗi nhận dạng giọng nói: ' + event.error);
-        recognizing = false;
-        voiceBtn.textContent = '🎤';
-      };
-      recognition.onend = () => {
-        recognizing = false;
-        voiceBtn.textContent = '🎤';
-        if (userInput.value.trim()) sendMessage();
-      };
-      voiceBtn.addEventListener('click', () => {
-        if (recognizing) recognition.stop();
-        else recognition.start();
-      });
-    } else {
-      voiceBtn.disabled = true;
-      toast('Trình duyệt không hỗ trợ Voice Chat');
     }
   </script>
 </body>
