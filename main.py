@@ -1,128 +1,96 @@
 from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-import os
-import shutil
+import os, shutil
 import google.generativeai as genai
 
 app = FastAPI()
 
-# --- CORS cho frontend ---
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    CORSMiddleware, allow_origins=["*"], allow_credentials=True,
+    allow_methods=["*"], allow_headers=["*"]
 )
 
-# --- Cấu hình Gemini ---
+# --- Gemini ---
 api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
-    raise RuntimeError("❌ GEMINI_API_KEY chưa được cấu hình trong biến môi trường!")
-
+    raise RuntimeError("❌ Chưa cấu hình GEMINI_API_KEY")
 genai.configure(api_key=api_key)
 
-# Models Gemini
 model_pro = genai.GenerativeModel("gemini-1.5-pro")
 model_flash = genai.GenerativeModel("gemini-1.5-flash")
 
-# Bộ nhớ tạm
-appointments = []        # lưu lịch hẹn
-conversations = {}       # lưu hội thoại theo user
-UPLOAD_DIR = "uploads"   # thư mục upload file
+appointments = []
+conversations = {}
+UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-
-# --- API Chat ---
+# --- Chat thường ---
 @app.post("/api/message")
 async def message(req: Request):
-    """Nhận tin nhắn từ frontend và gọi Gemini để trả lời"""
     data = await req.json()
-    user = data.get("username")
-    msg = data.get("message")
-
+    user, msg = data.get("username"), data.get("message")
     if not user or not msg:
         return {"reply": "⚠️ Thiếu username hoặc message."}
 
-    # Khởi tạo hội thoại nếu lần đầu
     if user not in conversations:
-        conversations[user] = [
-            {"role": "system", "content": "Bạn là một trợ lí y tế hữu ích."}
-        ]
+        conversations[user] = [{"role":"system","content":"Bạn là một trợ lí y tế hữu ích."}]
+    conversations[user].append({"role":"user","content":msg})
 
-    conversations[user].append({"role": "user", "content": msg})
-
-    # Ghép lịch sử hội thoại thành chuỗi
-    history_text = ""
-    for m in conversations[user]:
-        role = "Người dùng" if m["role"] == "user" else "Trợ lý"
-        history_text += f"{role}: {m['content']}\n"
-
-    # Gọi Gemini
+    history_text = "\n".join(
+        [("Người dùng" if m["role"]=="user" else "Trợ lý")+": "+m["content"] for m in conversations[user]]
+    )
     try:
         response = model_pro.generate_content(history_text)
         reply = response.text
     except Exception as e:
-        if "429" in str(e):  # hết quota → fallback sang flash
-            try:
-                response = model_flash.generate_content(history_text)
-                reply = response.text
-            except Exception as e2:
-                reply = f"❌ Lỗi gọi Gemini Flash API: {e2}"
-        else:
-            reply = f"❌ Lỗi gọi Gemini Pro API: {e}"
-
-    conversations[user].append({"role": "assistant", "content": reply})
+        try:
+            response = model_flash.generate_content(history_text)
+            reply = response.text
+        except Exception as e2:
+            reply = f"❌ Lỗi Gemini: {e2}"
+    conversations[user].append({"role":"assistant","content":reply})
     return {"reply": reply}
 
+# --- Chat kèm file ---
+@app.post("/api/message_with_file")
+async def message_with_file(user: str = Form(...), message: str = Form(""), file: UploadFile = File(...)):
+    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    with open(file_path,"wb") as f: shutil.copyfileobj(file.file, f)
 
-# --- API Upload File ---
-@app.post("/api/upload")
-async def upload_file(user: str = Form(...), file: UploadFile = File(...)):
-    """Nhận file từ người dùng và lưu vào thư mục uploads/"""
+    summary = ""
+    if file.content_type.startswith("text/"):
+        with open(file_path,"r",encoding="utf-8",errors="ignore") as f:
+            content = f.read(500)
+        resp = model_flash.generate_content(f"Hãy tóm tắt ngắn gọn:\n{content}")
+        summary = "\n📝 Tóm tắt file: " + resp.text
+    elif file.content_type.startswith("image/"):
+        summary = "\n📷 Đây là ảnh. Bạn có muốn tôi phân tích thêm không?"
+
+    # gom câu hỏi + file
+    full_msg = f"{message}\n(Đính kèm: {file.filename})"
+    if user not in conversations:
+        conversations[user] = [{"role":"system","content":"Bạn là một trợ lí y tế hữu ích."}]
+    conversations[user].append({"role":"user","content":full_msg})
+
+    history_text = "\n".join(
+        [("Người dùng" if m["role"]=="user" else "Trợ lý")+": "+m["content"] for m in conversations[user]]
+    )
     try:
-        file_path = os.path.join(UPLOAD_DIR, file.filename)
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        response = model_pro.generate_content(history_text)
+        reply = response.text
+    except:
+        response = model_flash.generate_content(history_text)
+        reply = response.text
+    conversations[user].append({"role":"assistant","content":reply})
+    return {"reply": reply + summary}
 
-        reply = f"📎 File '{file.filename}' đã được tải lên thành công."
-
-        # Nếu là ảnh → gợi ý phân tích
-        if file.content_type.startswith("image/"):
-            reply += " Đây là ảnh, bạn có muốn tôi phân tích nội dung ảnh không?"
-
-        # Nếu là text → tóm tắt nội dung
-        elif file.content_type.startswith("text/"):
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                content = f.read(500)  # chỉ đọc 500 ký tự đầu
-            ai_resp = model_flash.generate_content(
-                f"Đây là nội dung file:\n{content}\n\nHãy tóm tắt ngắn gọn cho bệnh nhân."
-            )
-            reply += "\n📝 Tóm tắt: " + ai_resp.text
-
-        return {"reply": reply}
-    except Exception as e:
-        return {"reply": f"❌ Lỗi upload file: {e}"}
-
-
-# --- API Lấy lịch hẹn ---
+# --- Appointment ---
 @app.get("/api/appointments")
 async def get_appts(user: str):
-    """Trả về danh sách lịch hẹn của 1 user"""
-    user_appts = [a for a in appointments if a["user"] == user]
-    return {"appointments": user_appts}
+    return {"appointments": [a for a in appointments if a["user"] == user]}
 
-
-# --- API Đặt lịch hẹn ---
 @app.post("/api/book")
 async def book(req: Request):
-    """Đặt lịch hẹn mới"""
     data = await req.json()
     appt = {
-        "user": data["user"],
-        "clinic": data["clinic"],
-        "date": data["date"],
-        "time": data["time"],
-    }
-    appointments.append(appt)
-    return {"message": "✅ Đặt lịch thành công", "appointment": appt}
+        "user":
