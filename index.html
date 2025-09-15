@@ -20,6 +20,7 @@
 </head>
 <body class="bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100 min-h-screen">
   <div class="max-w-5xl mx-auto p-4 sm:p-6">
+    <!-- Header -->
     <header class="flex items-center justify-between gap-4 mb-4">
       <div>
         <h1 class="text-2xl sm:text-3xl font-bold">Trợ lí Y tế</h1>
@@ -30,29 +31,19 @@
       </div>
     </header>
 
+    <!-- Main layout -->
     <div class="grid md:grid-cols-3 gap-4">
       <!-- Chat Panel -->
       <section class="md:col-span-2 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col h-[72vh]">
-        <div id="chatHistory" class="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin">
-        </div>
-
+        <div id="chatHistory" class="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin"></div>
         <div class="border-t border-slate-100 dark:border-slate-700 p-3">
           <div class="flex gap-2 items-end">
-            <textarea id="userInput" rows="2" placeholder="Bạn muốn hỏi gì? (ví dụ: cách phòng cảm cúm, tìm phòng khám gần đây, đặt lịch...)" class="flex-1 resize-none px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring focus:ring-indigo-500/30"></textarea>
-            <div class="flex flex-col gap-2">
-              <button id="sendBtn" class="px-4 py-2 rounded-2xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500">Gửi</button>
-              <button id="speakToggleBtn" class="px-4 py-2 rounded-2xl bg-slate-100 text-slate-800 text-sm">🔊 Tự phát trả lời</button>
-            </div>
+            <textarea id="userInput" rows="2" placeholder="Bạn muốn hỏi gì?" class="flex-1 resize-none px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring focus:ring-indigo-500/30"></textarea>
+            <button id="sendBtn" class="px-4 py-2 rounded-2xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500">Gửi</button>
+            <!-- Gửi ảnh -->
+            <input type="file" id="imageInput" accept="image/*" class="hidden" />
+            <button id="sendImageBtn" class="px-4 py-2 rounded-2xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500">📷</button>
           </div>
-
-          <div class="flex items-center gap-2 mt-3">
-            <button id="startRecBtn" class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white">🎙 Ghi âm & chuyển thành chữ</button>
-            <button id="stopRecBtn" class="px-3 py-1.5 rounded-xl bg-rose-500 text-white">⏹ Dừng</button>
-            <input id="imageInput" type="file" accept="image/*" class="hidden" />
-            <button id="pickImageBtn" class="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700">📷 Gửi ảnh</button>
-            <div id="imagePreview" class="ml-2"></div>
-          </div>
-
           <div class="flex flex-wrap gap-2 mt-2 text-sm">
             <button class="quickCmd px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-700" data-text="xem lịch">Xem lịch</button>
             <button class="quickCmd px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-700" data-text="đặt lịch">Đặt lịch</button>
@@ -97,10 +88,8 @@
   </div>
 
   <script>
-    // ====== CONFIG – chỉnh nếu backend của bạn chạy ở port khác ======
     const API_BASE = "https://trolyyte-2.onrender.com";
 
-    // UI elements
     const chatHistory = document.getElementById('chatHistory');
     const userInput = document.getElementById('userInput');
     const sendBtn = document.getElementById('sendBtn');
@@ -108,26 +97,13 @@
     const saveNameBtn = document.getElementById('saveNameBtn');
     const refreshApptBtn = document.getElementById('refreshApptBtn');
     const apptList = document.getElementById('apptList');
-
     const clinicEl = document.getElementById('clinic');
     const dateEl = document.getElementById('date');
     const timeEl = document.getElementById('time');
     const bookForm = document.getElementById('bookForm');
+    const imageInput = document.getElementById("imageInput");
+    const sendImageBtn = document.getElementById("sendImageBtn");
 
-    const startRecBtn = document.getElementById('startRecBtn');
-    const stopRecBtn = document.getElementById('stopRecBtn');
-    const pickImageBtn = document.getElementById('pickImageBtn');
-    const imageInput = document.getElementById('imageInput');
-    const imagePreview = document.getElementById('imagePreview');
-    const speakToggleBtn = document.getElementById('speakToggleBtn');
-
-    let autoSpeak = false;
-    speakToggleBtn.addEventListener('click', () => {
-      autoSpeak = !autoSpeak;
-      speakToggleBtn.textContent = autoSpeak ? '🔊 Tự phát: BẬT' : '🔊 Tự phát trả lời';
-    });
-
-    // Save/load username
     const persistedName = localStorage.getItem('health_username');
     if (persistedName) usernameEl.value = persistedName;
 
@@ -138,7 +114,6 @@
       toast('Đã lưu tên: ' + name);
     });
 
-    // Quick command buttons
     document.querySelectorAll('.quickCmd').forEach(b => {
       b.addEventListener('click', () => {
         userInput.value = b.dataset.text;
@@ -146,37 +121,23 @@
       });
     });
 
-    // Message rendering
-    function addMsg(role, text, options = {}) {
+    sendBtn.addEventListener('click', sendMessage);
+    userInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    function addMsg(role, text) {
       const wrap = document.createElement('div');
       wrap.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
-
       const bubble = document.createElement('div');
       bubble.className = `max-w-[85%] px-3 py-2 rounded-2xl shadow-sm border text-sm whitespace-pre-wrap ${role === 'user' ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'}`;
-      bubble.innerHTML = marked.parse(text || '');
-
-      if (options.asMedia && options.url) {
-        const media = document.createElement('audio');
-        media.controls = true;
-        media.src = options.url;
-        bubble.appendChild(document.createElement('br'));
-        bubble.appendChild(media);
-      }
-
+      bubble.innerHTML = marked.parse(text);
       wrap.appendChild(bubble);
       chatHistory.appendChild(wrap);
       chatHistory.scrollTop = chatHistory.scrollHeight;
-
-      // auto speak if assistant and setting on
-      if (role === 'assistant' && autoSpeak) {
-        speakText(stripHTML(text || ''));
-      }
-    }
-
-    function stripHTML(html) {
-      const tmp = document.createElement('div');
-      tmp.innerHTML = html;
-      return tmp.textContent || tmp.innerText || '';
     }
 
     function toast(msg) {
@@ -187,18 +148,9 @@
       setTimeout(() => t.remove(), 2200);
     }
 
-    // ======= Send message to backend (normal text messages) =======
-    sendBtn.addEventListener('click', sendMessage);
-    userInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
-
-    async function sendMessage(messageOverride = null) {
+    async function sendMessage() {
       const name = (usernameEl.value || '').trim();
-      const message = messageOverride ?? (userInput.value || '').trim();
+      const message = (userInput.value || '').trim();
       if (!name) { alert('Hãy nhập và lưu tên trước.'); return; }
       if (!message) return;
 
@@ -211,10 +163,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username: name, message })
         });
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text || 'Lỗi server');
-        }
+        if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
         addMsg('assistant', data.reply || '');
       } catch (err) {
@@ -223,7 +172,6 @@
       }
     }
 
-    // ======= Appointments =======
     async function loadAppointments() {
       const name = (usernameEl.value || '').trim();
       if (!name) { alert('Hãy nhập và lưu tên trước.'); return; }
@@ -278,15 +226,10 @@
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
 
-        // GỬI SANG GOOGLE SHEETS (giữ nguyên)
+        // Ghi thêm vào Google Sheets
         await fetch("https://script.google.com/macros/s/AKfycbzWE79uuLGZMV9PiyruPfj4tGzJH5ttiZKg-EYztZgADslNojf9Bh5N4uHhtTljksDB/exec", {
           method: "POST",
-          body: JSON.stringify({
-            name: payload.user,
-            clinic: payload.clinic,
-            date: payload.date,
-            time: payload.time
-          })
+          body: JSON.stringify(payload)
         });
 
         toast(data.message || 'Đặt lịch thành công');
@@ -300,141 +243,30 @@
       }
     });
 
-    if (persistedName) {
-      setTimeout(loadAppointments, 300);
-    }
-
-    // ======= Voice: Web Speech API (client-side) =======
-    let recognition = null;
-    let mediaRecorder = null;
-    let audioChunks = [];
-
-    function supportsWebSpeech() {
-      return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-    }
-
-    if (supportsWebSpeech()) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition = new SpeechRecognition();
-      recognition.lang = 'vi-VN';
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        userInput.value = transcript;
-        // tự gửi luôn sau khi nhận nếu muốn:
-        sendMessage(transcript);
-      };
-      recognition.onerror = (e) => {
-        console.error('Speech recognition error', e);
-        toast('Lỗi nhận giọng nói: ' + (e.error || 'unknown'));
-      };
-    } else {
-      // fallback: MediaRecorder to upload audio to server (server must provide /api/transcribe)
-      console.warn('Web Speech API không được hỗ trợ - sẽ dùng phương án ghi và upload (nếu server có /api/transcribe).');
-    }
-
-    startRecBtn.addEventListener('click', async () => {
-      // If Web Speech supported, start it
-      if (recognition) {
-        try {
-          recognition.start();
-          toast('Bắt đầu nghe... nói vào micro');
-        } catch (e) {
-          console.error(e);
-        }
-        return;
-      }
-
-      // Fallback: start MediaRecorder
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert('Trình duyệt không hỗ trợ ghi âm. Hãy thử Chrome/Edge bản mới.');
-        return;
-      }
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        audioChunks = [];
-        mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-        mediaRecorder.onstop = async () => {
-          const blob = new Blob(audioChunks, { type: 'audio/webm' });
-          // upload to server for transcription (server must implement /api/transcribe)
-          const form = new FormData();
-          form.append('file', blob, 'recording.webm');
-          try {
-            const res = await fetch(`${API_BASE}/api/transcribe`, { method: 'POST', body: form });
-            if (!res.ok) throw new Error(await res.text());
-            const data = await res.json();
-            const text = data.transcript || '';
-            userInput.value = text;
-            if (text) sendMessage(text);
-          } catch (err) {
-            console.error(err);
-            alert('Lỗi khi gửi file âm thanh cho server. Kiểm tra /api/transcribe.');
-          }
-        };
-        mediaRecorder.start();
-        toast('Đang ghi âm...');
-      } catch (err) {
-        console.error(err);
-        alert('Không thể truy cập micro.');
-      }
-    });
-
-    stopRecBtn.addEventListener('click', () => {
-      if (recognition) {
-        try { recognition.stop(); toast('Dừng nghe'); } catch(e){}
-      }
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop();
-        toast('Dừng ghi âm, đang gửi file lên server...');
-      }
-    });
-
-    // ======= Text to speech (client-side) =======
-    function speakText(text) {
-      if (!('speechSynthesis' in window)) return;
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = 'vi-VN';
-      // optional: set voice / rate / pitch
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utter);
-    }
-
-    // ======= Image upload UI =======
-    pickImageBtn.addEventListener('click', () => imageInput.click());
-    imageInput.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
+    // Xử lý gửi ảnh
+    sendImageBtn.addEventListener("click", () => imageInput.click());
+    imageInput.addEventListener("change", async () => {
+      const file = imageInput.files[0];
       if (!file) return;
-      // preview
-      const url = URL.createObjectURL(file);
-      imagePreview.innerHTML = `<img src="${url}" class="h-16 rounded-md border" />`;
-
-      // send to backend
-      const name = (usernameEl.value || '').trim();
-      if (!name) { alert('Hãy nhập và lưu tên trước.'); return; }
-
-      const form = new FormData();
-      form.append('image', file);
-      form.append('user', name);
+      const formData = new FormData();
+      formData.append("file", file);
+      addMsg("user", "📷 Bạn vừa gửi ảnh: " + file.name);
 
       try {
-        const res = await fetch(`${API_BASE}/api/image`, { method: 'POST', body: form });
+        const res = await fetch(`${API_BASE}/api/image`, {
+          method: "POST",
+          body: formData,
+        });
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
-        // server trả về mô tả text
-        addMsg('user', `Đã gửi ảnh: ${file.name}`);
-        addMsg('assistant', data.description || 'Máy chủ đã nhận ảnh, nhưng chưa có mô tả chi tiết.');
+        addMsg("assistant", data.reply || "Không có phản hồi từ AI.");
       } catch (err) {
         console.error(err);
-        alert('Gửi ảnh thất bại.');
-      } finally {
-        // revoke object url
-        setTimeout(() => URL.revokeObjectURL(url), 3000);
+        addMsg("assistant", "❌ Gửi ảnh thất bại.");
       }
     });
 
+    if (persistedName) setTimeout(loadAppointments, 300);
   </script>
 </body>
 </html>
