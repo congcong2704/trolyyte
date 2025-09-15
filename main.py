@@ -14,12 +14,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Lấy key Gemini từ biến môi trường ---
-GEN_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEN_API_KEY:
-    raise ValueError("Bạn chưa thiết lập biến môi trường GEMINI_API_KEY trên Render!")
+# ===== Gemini API =====
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise ValueError("⚠️ Chưa cấu hình GEMINI_API_KEY trong environment variables!")
 
-client = genai.Client(api_key=GEN_API_KEY)
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 # --- Lưu trữ tạm thời ---
 appointments = []
