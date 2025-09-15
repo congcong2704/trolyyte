@@ -1,11 +1,11 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import os
-import google.generativeai as genai
+from google import genai  # Thư viện mới google-genai
 
 app = FastAPI()
 
-# CORS
+# CORS để frontend gọi API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,18 +14,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Lấy key từ biến môi trường
+# --- Lấy key Gemini từ biến môi trường ---
 GEN_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEN_API_KEY:
     raise ValueError("Bạn chưa thiết lập biến môi trường GEMINI_API_KEY trên Render!")
 
-genai.configure(api_key=GEN_API_KEY)
+client = genai.Client(api_key=GEN_API_KEY)
 
-# Lưu trữ tạm thời
+# --- Lưu trữ tạm thời ---
 appointments = []
 conversations = {}
 
-# --- API chat ---
+# ===== API chat =====
 @app.post("/api/message")
 async def message(req: Request):
     data = await req.json()
@@ -35,41 +35,41 @@ async def message(req: Request):
     if not user or not msg:
         return {"reply": "Thiếu thông tin username hoặc message."}
 
+    # Khởi tạo conversation nếu chưa có
     if user not in conversations:
         conversations[user] = [
-            {"author": "system", "content": "Bạn là một trợ lí y tế hữu ích."}
+            {"role": "system", "content": "Bạn là một trợ lí y tế hữu ích."}
         ]
 
-    conversations[user].append({"author": "user", "content": msg})
+    conversations[user].append({"role": "user", "content": msg})
 
     try:
-        response = genai.chat.create(
-            model="models/chat-bison-001",
-            messages=conversations[user],
+        # Gửi message tới Gemini AI
+        response = client.models.generate_message(
+            model="gemini-2.5-chat",
+            input_messages=conversations[user],
             temperature=0.7,
             max_output_tokens=1024
         )
 
-        # Lấy nội dung trả về an toàn
-        if response and hasattr(response, "last") and response.last:
-            reply = response.last.get("content", [{}])[0].get("text", "...")
-        else:
-            reply = "Không nhận được phản hồi từ Gemini."
+        # Lấy nội dung trả về
+        reply = response.output_text if hasattr(response, "output_text") else "Không nhận được phản hồi từ Gemini."
 
-        conversations[user].append({"author": "assistant", "content": reply})
+        # Lưu lại vào conversation
+        conversations[user].append({"role": "assistant", "content": reply})
 
     except Exception as e:
         reply = f"Lỗi gọi Gemini API: {e}"
 
     return {"reply": reply}
 
-# --- API lấy lịch hẹn ---
+# ===== API lấy lịch hẹn =====
 @app.get("/api/appointments")
 async def get_appts(user: str):
     user_appts = [a for a in appointments if a["user"] == user]
     return {"appointments": user_appts}
 
-# --- API đặt lịch ---
+# ===== API đặt lịch =====
 @app.post("/api/book")
 async def book(req: Request):
     data = await req.json()
@@ -82,5 +82,5 @@ async def book(req: Request):
     appointments.append(appt)
     return {"message": "Đặt lịch thành công", "appointment": appt}
 
-# --- Start Command trên Render ---
-# Trên Render, bạn sẽ điền: uvicorn main:app --host 0.0.0.0 --port $PORT
+# --- Lưu ý Start Command trên Render ---
+# uvicorn main:app --host 0.0.0.0 --port $PORT
