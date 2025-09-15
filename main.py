@@ -44,16 +44,19 @@ async def message(req: Request):
     conversations[user].append({"role": "user", "content": msg})
 
     try:
-        # Gọi Gemini AI
-        response = genai.chat.create(
+        response = genai.models.generate_message(
             model="gemini-2.5-chat",
-            messages=conversations[user],
+            input_messages=conversations[user],
             temperature=0.7,
             max_output_tokens=1024
         )
 
-        # Lấy nội dung trả về
-        reply = response.last.message
+        reply = response.output_text if hasattr(response, "output_text") else "Không nhận được phản hồi từ Gemini."
+        conversations[user].append({"role": "assistant", "content": reply})
+
+    except Exception as e:
+        reply = f"Lỗi gọi Gemini API: {e}"
+
 
         # Lưu lại vào conversation
         conversations[user].append({"role": "assistant", "content": reply})
