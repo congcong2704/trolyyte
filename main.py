@@ -6,7 +6,7 @@ import google.generativeai as genai
 
 app = FastAPI()
 
-# CORS để cho frontend gọi API
+# --- CORS cho frontend ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  
@@ -22,28 +22,29 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 
-# Models
+# Models Gemini
 model_pro = genai.GenerativeModel("gemini-1.5-pro")
 model_flash = genai.GenerativeModel("gemini-1.5-flash")
 
 # Bộ nhớ tạm
-appointments = []
-conversations = {}
-
-UPLOAD_DIR = "uploads"
+appointments = []        # lưu lịch hẹn
+conversations = {}       # lưu hội thoại theo user
+UPLOAD_DIR = "uploads"   # thư mục upload file
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
+# --- API Chat ---
 @app.post("/api/message")
 async def message(req: Request):
-    """Nhận tin nhắn từ frontend, gọi Gemini để trả lời"""
+    """Nhận tin nhắn từ frontend và gọi Gemini để trả lời"""
     data = await req.json()
     user = data.get("username")
     msg = data.get("message")
 
     if not user or not msg:
-        return {"reply": "⚠️ Thiếu thông tin username hoặc message."}
+        return {"reply": "⚠️ Thiếu username hoặc message."}
 
+    # Khởi tạo hội thoại nếu lần đầu
     if user not in conversations:
         conversations[user] = [
             {"role": "system", "content": "Bạn là một trợ lí y tế hữu ích."}
@@ -51,28 +52,31 @@ async def message(req: Request):
 
     conversations[user].append({"role": "user", "content": msg})
 
+    # Ghép lịch sử hội thoại thành chuỗi
     history_text = ""
     for m in conversations[user]:
         role = "Người dùng" if m["role"] == "user" else "Trợ lý"
         history_text += f"{role}: {m['content']}\n"
 
+    # Gọi Gemini
     try:
         response = model_pro.generate_content(history_text)
         reply = response.text
     except Exception as e:
-        if "429" in str(e):  # hết quota → fallback
+        if "429" in str(e):  # hết quota → fallback sang flash
             try:
                 response = model_flash.generate_content(history_text)
                 reply = response.text
             except Exception as e2:
-                reply = f"Lỗi gọi Gemini Flash API: {e2}"
+                reply = f"❌ Lỗi gọi Gemini Flash API: {e2}"
         else:
-            reply = f"Lỗi gọi Gemini Pro API: {e}"
+            reply = f"❌ Lỗi gọi Gemini Pro API: {e}"
 
     conversations[user].append({"role": "assistant", "content": reply})
     return {"reply": reply}
 
 
+# --- API Upload File ---
 @app.post("/api/upload")
 async def upload_file(user: str = Form(...), file: UploadFile = File(...)):
     """Nhận file từ người dùng và lưu vào thư mục uploads/"""
@@ -90,7 +94,7 @@ async def upload_file(user: str = Form(...), file: UploadFile = File(...)):
         # Nếu là text → tóm tắt nội dung
         elif file.content_type.startswith("text/"):
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                content = f.read(500)
+                content = f.read(500)  # chỉ đọc 500 ký tự đầu
             ai_resp = model_flash.generate_content(
                 f"Đây là nội dung file:\n{content}\n\nHãy tóm tắt ngắn gọn cho bệnh nhân."
             )
@@ -101,6 +105,7 @@ async def upload_file(user: str = Form(...), file: UploadFile = File(...)):
         return {"reply": f"❌ Lỗi upload file: {e}"}
 
 
+# --- API Lấy lịch hẹn ---
 @app.get("/api/appointments")
 async def get_appts(user: str):
     """Trả về danh sách lịch hẹn của 1 user"""
@@ -108,6 +113,7 @@ async def get_appts(user: str):
     return {"appointments": user_appts}
 
 
+# --- API Đặt lịch hẹn ---
 @app.post("/api/book")
 async def book(req: Request):
     """Đặt lịch hẹn mới"""
@@ -119,4 +125,4 @@ async def book(req: Request):
         "time": data["time"],
     }
     appointments.append(appt)
-    return {"message": "Đặt lịch thành công", "appointment": appt}
+    return {"message": "✅ Đặt lịch thành công", "appointment": appt}
