@@ -8,7 +8,7 @@ app = FastAPI()
 # === CORS cho frontend GitHub Pages gọi ===
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://congcong2704.github.io"],  # đổi thành domain GitHub Pages của bạn
+    allow_origins=["https://congcong2704.github.io"],  # domain frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -21,12 +21,12 @@ if not GEMINI_API_KEY:
 
 genai.configure(api_key=GEMINI_API_KEY)
 
-# === Model Gemini ===
+# === Tạo model ===
 model = genai.GenerativeModel("gemini-1.5-flash")
 
-# === Lưu trữ tạm thời ===
-appointments = []
+# === Lưu trữ tạm hội thoại và lịch hẹn ===
 conversations = {}
+appointments = []
 
 # === API chat ===
 @app.post("/api/message")
@@ -38,7 +38,7 @@ async def message(req: Request):
     if not user or not msg:
         return {"reply": "Thiếu thông tin username hoặc message."}
 
-    # Tạo hội thoại riêng cho mỗi user
+    # Nếu user chưa có hội thoại thì tạo mới
     if user not in conversations:
         conversations[user] = model.start_chat(
             history=[{"role": "system", "parts": "Bạn là trợ lí y tế hữu ích."}]
@@ -46,7 +46,7 @@ async def message(req: Request):
 
     try:
         chat = conversations[user]
-        response = chat.send_message(msg)
+        response = chat.send_message(msg)   # <--- đúng cách gọi
         reply = response.text
     except Exception as e:
         reply = f"Lỗi gọi Gemini API: {e}"
