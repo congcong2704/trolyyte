@@ -8,7 +8,7 @@ app = FastAPI()
 # === CORS cho frontend GitHub Pages gọi ===
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://congcong2704.github.io"],  # bạn có thể đổi thành "https://yourusername.github.io"
+    allow_origins=["https://congcong2704.github.io"],  # đổi thành domain GitHub Pages của bạn
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -20,6 +20,9 @@ if not GEMINI_API_KEY:
     raise ValueError("⚠️ GEMINI_API_KEY chưa được cấu hình!")
 
 genai.configure(api_key=GEMINI_API_KEY)
+
+# === Model Gemini ===
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 # === Lưu trữ tạm thời ===
 appointments = []
@@ -35,25 +38,18 @@ async def message(req: Request):
     if not user or not msg:
         return {"reply": "Thiếu thông tin username hoặc message."}
 
+    # Tạo hội thoại riêng cho mỗi user
     if user not in conversations:
-        conversations[user] = [
-            {"role": "system", "content": "Bạn là trợ lí y tế hữu ích."}
-        ]
-
-    conversations[user].append({"role": "user", "content": msg})
+        conversations[user] = model.start_chat(
+            history=[{"role": "system", "parts": "Bạn là trợ lí y tế hữu ích."}]
+        )
 
     try:
-        response = genai.models.generate_message(
-            model="gemini-2.5-chat",
-            input_messages=conversations[user],
-            temperature=0.7,
-            max_output_tokens=1024
-        )
-        reply = response.output_text if hasattr(response, "output_text") else "Không nhận được phản hồi từ Gemini."
-        conversations[user].append({"role": "assistant", "content": reply})
+        chat = conversations[user]
+        response = chat.send_message(msg)
+        reply = response.text
     except Exception as e:
         reply = f"Lỗi gọi Gemini API: {e}"
-        conversations[user].append({"role": "assistant", "content": reply})
 
     return {"reply": reply}
 
